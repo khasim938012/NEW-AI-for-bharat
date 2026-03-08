@@ -1,0 +1,2126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AICORE - State Portal & Voice Assistant</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        darkBg: '#0b0612',
+                        panelBg: '#150e1f',
+                        cardBg: '#1e142b',
+                        primary: '#d946ef', // fuchsia-500
+                        secondary: '#8b5cf6', // violet-500
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    animation: {
+                        'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0b0612;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #3b2854;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #5b3e82;
+        }
+        
+        .gradient-text {
+            background: linear-gradient(to right, #ec4899, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .gradient-bg {
+            background: linear-gradient(to right, #ec4899, #8b5cf6);
+        }
+        .gradient-hover:hover {
+            background: linear-gradient(to right, #f472b6, #a78bfa);
+        }
+
+        /* Glassmorphism utilities */
+        .glass {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Hide sections initially */
+        .view-section { display: none; }
+        .view-section.active { display: block; animation: fadeIn 0.3s ease-in-out; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Mic pulse effect */
+        .mic-active-ring {
+            box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.7);
+            animation: pulse-ring 1.5s infinite cubic-bezier(0.66, 0, 0, 1);
+        }
+        @keyframes pulse-ring {
+            to {
+                box-shadow: 0 0 0 30px rgba(236, 72, 153, 0);
+            }
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .auth-input {
+            background: rgba(0, 0, 0, 0.2) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            color: white !important;
+        }
+        .auth-input:focus {
+            border-color: #ec4899 !important;
+            box-shadow: 0 0 10px rgba(236, 72, 153, 0.3) !important;
+            outline: none;
+        }
+    </style>
+</head>
+<body class="bg-darkBg text-white h-screen w-full overflow-hidden flex font-sans selection:bg-primary selection:text-white">
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-5 right-5 z-[70] flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- ================= AUTHENTICATION VIEW ================= -->
+    <div id="auth-view" class="fixed inset-0 z-50 flex items-center justify-center overflow-hidden">
+        <!-- Animated vibrant background -->
+        <div class="absolute inset-0 bg-gradient-to-br from-[#0f0c29] via-[#302b63] to-[#24243e] animate-[gradientBG_15s_ease_infinite] bg-[length:400%_400%]"></div>
+        
+        <!-- Decorative glowing orbs behind the panel -->
+        <div class="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-primary rounded-full mix-blend-screen filter blur-[120px] opacity-40"></div>
+        <div class="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-secondary rounded-full mix-blend-screen filter blur-[120px] opacity-40"></div>
+
+        <div class="glass p-10 rounded-3xl shadow-2xl w-full max-w-md relative z-10 border border-white/10">
+            <div class="text-center mb-8">
+                <div class="w-16 h-16 rounded-2xl bg-gradient-to-r from-primary to-secondary mx-auto mb-4 flex items-center justify-center shadow-[0_0_20px_rgba(236,72,153,0.4)] transform transition hover:-translate-y-1">
+                    <i class="fa-solid fa-fingerprint text-3xl text-white"></i>
+                </div>
+                <h1 class="text-3xl font-bold tracking-wide">AI<span class="text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">CORE</span></h1>
+                <p class="text-gray-400 text-sm mt-1">AI-Powered Citizen Services</p>
+            </div>
+
+            <div id="login-form">
+                <h2 class="text-xl font-semibold mb-6">Sign In to Dashboard</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs text-gray-400 uppercase tracking-wider mb-1">Email Address</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-envelope absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500"></i>
+                            <input type="email" id="login-email" class="w-full auth-input pl-10 pr-4 py-3 rounded-xl transition" placeholder="citizen@india.gov" value="citizen@india.gov">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 uppercase tracking-wider mb-1">Password</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-lock absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500"></i>
+                            <input type="password" id="login-pass" class="w-full auth-input pl-10 pr-4 py-3 rounded-xl transition" placeholder="••••••••" value="password123">
+                        </div>
+                    </div>
+                    <button onclick="handleLogin()" class="w-full bg-gradient-to-r from-primary to-secondary hover:from-pink-400 hover:to-purple-400 text-white font-bold rounded-xl py-3.5 mt-6 shadow-[0_0_15px_rgba(236,72,153,0.3)] transition transform hover:-translate-y-0.5 flex items-center justify-center gap-2">
+                        Access Account <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                    
+                    <div class="mt-4 p-4 bg-black/20 border border-white/5 rounded-xl text-xs text-gray-400 flex flex-col gap-2">
+                        <span class="font-semibold text-primary"><i class="fa-solid fa-shield-halved"></i> Demo Credentials:</span>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div class="bg-white/5 p-2 rounded border border-white/5 cursor-pointer hover:bg-white/10" onclick="document.getElementById('login-email').value='citizen@india.gov'; document.getElementById('login-pass').value='password123';">
+                                <span class="block text-[10px] text-gray-500">CITIZEN USER</span>
+                                <span class="text-gray-300 font-mono">citizen@india.gov<br>password123</span>
+                            </div>
+                            <div class="bg-white/5 p-2 rounded border border-white/5 cursor-pointer hover:bg-white/10" onclick="document.getElementById('login-email').value='admin@india.gov'; document.getElementById('login-pass').value='admin123';">
+                                <span class="block text-[10px] text-gray-500">SYSTEM ADMIN</span>
+                                <span class="text-gray-300 font-mono">admin@india.gov<br>admin123</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-center text-sm text-gray-400 mt-6">
+                        New citizen? <button onclick="toggleAuthMode()" class="text-primary font-bold hover:text-pink-400 transition">Register here</button>
+                    </p>
+                </div>
+            </div>
+
+            <div id="register-form" class="hidden">
+                <h2 class="text-xl font-semibold mb-6">Create New Account</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs text-gray-400 uppercase tracking-wider mb-1">Full Name</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-user absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500"></i>
+                            <input type="text" id="reg-name" class="w-full auth-input pl-10 pr-4 py-3 rounded-xl transition" placeholder="Aadhaar Name">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 uppercase tracking-wider mb-1">Email Address</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-envelope absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500"></i>
+                            <input type="email" id="reg-email" class="w-full auth-input pl-10 pr-4 py-3 rounded-xl transition" placeholder="Enter your email">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 uppercase tracking-wider mb-1">Password</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-lock absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500"></i>
+                            <input type="password" id="reg-pass" class="w-full auth-input pl-10 pr-4 py-3 rounded-xl transition" placeholder="••••••••">
+                        </div>
+                    </div>
+                    <button onclick="handleRegister()" class="w-full bg-gradient-to-r from-primary to-secondary hover:from-pink-400 hover:to-purple-400 text-white font-bold rounded-xl py-3.5 mt-6 shadow-[0_0_15px_rgba(236,72,153,0.3)] transition transform hover:-translate-y-0.5 flex items-center justify-center gap-2">
+                        Register Account <i class="fa-solid fa-user-plus"></i>
+                    </button>
+                    <p class="text-center text-sm text-gray-400 mt-6">
+                        Already registered? <button onclick="toggleAuthMode()" class="text-primary font-bold hover:text-pink-400 transition">Sign in</button>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= MAIN APP DASHBOARD ================= -->
+    <div id="main-app" class="hidden w-full h-full flex">
+        
+        <!-- Sidebar -->
+        <aside class="w-64 bg-panelBg border-r border-white/5 flex flex-col h-full hidden md:flex shrink-0 z-20 relative">
+            <!-- Logo -->
+            <div class="h-20 flex items-center px-6 border-b border-white/5">
+                <div class="flex items-center gap-3 cursor-pointer" onclick="switchView('assistant')">
+                    <div class="w-8 h-8 rounded bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center">
+                        <i class="fa-solid fa-bolt text-white text-sm"></i>
+                    </div>
+                    <h1 class="text-xl font-bold tracking-wider">AI<span class="text-red-500">CORE</span></h1>
+                </div>
+            </div>
+
+            <!-- Navigation -->
+            <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1" id="sidebar-nav">
+                <!-- Nav items generated via JS -->
+            </nav>
+
+            <!-- User Mini Profile -->
+            <div class="p-4 border-t border-white/5 flex items-center gap-3 cursor-pointer hover:bg-white/5 transition rounded-xl mx-2 my-2" onclick="logout()">
+                <img src="https://ui-avatars.com/api/?name=User&background=d946ef&color=fff" class="w-10 h-10 rounded-full" alt="User" id="sidebar-avatar">
+                <div class="overflow-hidden">
+                    <p class="text-sm font-semibold truncate" id="user-display-name">Citizen</p>
+                    <p class="text-xs text-gray-400 truncate flex items-center gap-1"><i class="fa-solid fa-right-from-bracket"></i> Logout</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 flex flex-col h-full relative overflow-hidden">
+            
+            <!-- Top Header -->
+            <header class="h-20 bg-darkBg/80 backdrop-blur-md border-b border-white/5 flex items-center justify-between px-6 z-10 sticky top-0">
+                <div class="flex items-center gap-4">
+                    <button class="md:hidden text-gray-400 hover:text-white" onclick="document.querySelector('aside').classList.toggle('hidden')">
+                        <i class="fa-solid fa-bars text-xl"></i>
+                    </button>
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-sparkles text-primary"></i>
+                        <h2 class="text-lg font-bold tracking-widest text-gray-200" id="current-view-title">VOICE DASHBOARD</h2>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-4">
+                    <!-- State Selector -->
+                    <select id="state-selector" class="bg-cardBg border border-white/10 rounded-lg px-3 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-primary hidden sm:block" onchange="filterDataByState()">
+                        <option value="All">All States (National)</option>
+                        <option value="Karnataka">Karnataka</option>
+                        <option value="Andhra Pradesh">Andhra Pradesh</option>
+                        <option value="Maharashtra">Maharashtra</option>
+                        <option value="Delhi">Delhi</option>
+                    </select>
+                    
+                    <!-- Language Selector -->
+                    <select id="lang-selector" class="bg-cardBg border border-white/10 rounded-lg px-3 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-primary" onchange="updateVoiceLang()">
+                        <option value="en-IN">English (IN)</option>
+                        <option value="hi-IN">Hindi</option>
+                        <option value="kn-IN">Kannada</option>
+                        <option value="te-IN">Telugu</option>
+                        <option value="mr-IN">Marathi</option>
+                    </select>
+
+                    <button class="w-10 h-10 rounded-full bg-cardBg border border-white/10 flex items-center justify-center hover:bg-white/5 transition group relative" onclick="switchView('assistant')">
+                        <i class="fa-solid fa-microphone text-gray-400 group-hover:text-primary transition"></i>
+                        <span class="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse hidden" id="global-mic-indicator"></span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Main Dashboard Area (Exclusively for Voice Assistant) -->
+            <div class="flex-1 overflow-y-auto p-4 md:p-8 relative scroll-smooth flex items-center justify-center bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]">
+                
+                <div class="w-full max-w-2xl bg-panelBg/70 backdrop-blur-xl border border-white/10 rounded-3xl p-8 md:p-12 flex flex-col items-center shadow-[0_0_50px_rgba(0,0,0,0.5)] relative overflow-hidden">
+                    <!-- Abstract glow -->
+                    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-primary rounded-full mix-blend-multiply filter blur-[100px] opacity-20"></div>
+
+                    <h2 class="text-3xl md:text-4xl font-bold mb-12 text-center z-10">Talk to <span class="gradient-text">Intelligence</span></h2>
+                    
+                    <!-- Big Mic Button -->
+                    <button id="main-mic-btn" onclick="toggleVoiceAssistant()" class="w-32 h-32 rounded-full gradient-bg flex items-center justify-center shadow-[0_0_40px_rgba(236,72,153,0.4)] transition-transform hover:scale-105 z-10 mb-8 group">
+                        <i class="fa-solid fa-microphone text-5xl text-white group-hover:animate-bounce"></i>
+                    </button>
+
+                    <div id="listening-indicator" class="text-sm tracking-widest text-gray-400 mb-8 opacity-0 transition-opacity uppercase z-10">
+                        Listening... (Say 'Mute' to stop)
+                    </div>
+
+                    <!-- Chat/Input Area -->
+                    <div class="w-full relative z-10">
+                        <div class="relative flex items-center">
+                            <i class="fa-solid fa-magnifying-glass absolute left-4 text-gray-400"></i>
+                            <input type="text" id="ai-text-input" class="w-full bg-cardBg border border-white/10 rounded-xl py-4 pl-12 pr-16 text-white placeholder-gray-500 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition" placeholder="E.g. Open Schemes, or Apply for PM Kisan..." onkeypress="if(event.key === 'Enter') handleAITextSubmit()">
+                            <button onclick="handleAITextSubmit()" class="absolute right-3 text-primary hover:text-white p-2 transition">
+                                <i class="fa-solid fa-paper-plane"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- AI Response Area -->
+                    <div id="ai-response-area" class="w-full mt-6 bg-cardBg/90 rounded-xl p-5 border border-white/10 hidden z-10 shadow-lg">
+                        <div class="flex items-center gap-2 mb-3 text-primary border-b border-white/5 pb-2">
+                            <i class="fa-solid fa-robot"></i> <span class="font-bold text-sm tracking-wider uppercase">AI Assistant</span>
+                            <button onclick="stopTTS()" class="ml-auto text-gray-500 hover:text-white text-xs bg-white/5 px-2 py-1 rounded transition"><i class="fa-solid fa-volume-xmark"></i> Stop Audio</button>
+                        </div>
+                        <div id="ai-response-text" class="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto custom-scrollbar"></div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- SEPARATE FEATURE WINDOW (Overlay Modal) -->
+            <div id="feature-window" class="fixed inset-0 md:inset-6 z-40 bg-darkBg border border-white/20 md:rounded-3xl shadow-[0_0_80px_rgba(0,0,0,0.8)] flex-col hidden transform transition-all duration-300 scale-95 opacity-0">
+                
+                <!-- Window Header -->
+                <div class="h-16 bg-panelBg border-b border-white/10 flex items-center justify-between px-6 md:rounded-t-3xl sticky top-0 z-20">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
+                            <i id="fw-icon" class="fa-solid fa-layer-group text-primary"></i>
+                        </div>
+                        <h2 id="fw-title" class="font-bold text-lg tracking-widest text-white uppercase">FEATURE</h2>
+                    </div>
+                    <button onclick="switchView('assistant')" class="w-8 h-8 rounded-full bg-white/5 hover:bg-red-500/20 hover:text-red-500 text-gray-400 flex items-center justify-center transition group">
+                        <i class="fa-solid fa-xmark group-hover:scale-110 transition-transform"></i>
+                    </button>
+                </div>
+
+                <!-- Window Content Container -->
+                <div class="flex-1 overflow-y-auto p-4 md:p-8 relative custom-scrollbar bg-darkBg md:rounded-b-3xl" id="fw-content">
+                    
+                    <!-- 2. Govt Schemes View -->
+                    <div id="view-schemes" class="view-section">
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-2xl font-bold">Government Schemes</h2>
+                            <button onclick="refreshData()" class="bg-cardBg border border-white/10 px-4 py-2 rounded-lg text-sm hover:bg-white/5 transition flex items-center gap-2 text-primary">
+                                <i class="fa-solid fa-rotate"></i> AI Sync New Schemes
+                            </button>
+                        </div>
+                        <!-- Stats summary -->
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 text-center">
+                            <div class="bg-panelBg border border-white/5 p-4 rounded-xl">
+                                <div class="text-2xl font-bold gradient-text" id="scheme-count">12</div>
+                                <div class="text-xs text-gray-400">Available Schemes</div>
+                            </div>
+                            <div class="bg-panelBg border border-white/5 p-4 rounded-xl">
+                                <div class="text-2xl font-bold text-green-400">3</div>
+                                <div class="text-xs text-gray-400">Eligible (AI Match)</div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6" id="schemes-grid">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+
+                    <!-- 3. Scam Detector -->
+                    <div id="view-scam" class="view-section max-w-4xl mx-auto">
+                        <h2 class="text-2xl font-bold mb-2">Scam & Fake News Detector</h2>
+                        <p class="text-gray-400 text-sm mb-8">AI analyzes links, SMS texts, and images to detect frauds and fake news.</p>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <!-- Text/Link Check -->
+                            <div class="bg-panelBg border border-white/5 p-6 rounded-2xl">
+                                <h3 class="font-semibold mb-4 flex items-center gap-2"><i class="fa-solid fa-link text-primary"></i> Check Text or Link</h3>
+                                <textarea id="scam-input-text" class="w-full h-32 bg-cardBg border border-white/10 rounded-xl p-3 text-sm text-gray-300 focus:outline-none focus:border-primary mb-4" placeholder="Paste suspicious SMS, WhatsApp forward, or URL here..."></textarea>
+                                <button onclick="analyzeScamText()" class="w-full gradient-bg text-white font-bold rounded-xl py-3 text-sm shadow-lg hover:opacity-90 transition">Analyze with AI</button>
+                            </div>
+
+                            <!-- Image Check -->
+                            <div class="bg-panelBg border border-white/5 p-6 rounded-2xl flex flex-col">
+                                <h3 class="font-semibold mb-4 flex items-center gap-2"><i class="fa-solid fa-camera text-primary"></i> Scan QR/Image</h3>
+                                <div class="flex-1 border-2 border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center p-6 text-center hover:border-primary/50 transition cursor-pointer" onclick="document.getElementById('scam-file-upload').click()">
+                                    <i class="fa-solid fa-cloud-arrow-up text-4xl text-gray-500 mb-3"></i>
+                                    <p class="text-sm text-gray-300">Click to upload screenshot or photo</p>
+                                    <p class="text-xs text-gray-500 mt-1">Supports JPG, PNG</p>
+                                    <input type="file" id="scam-file-upload" class="hidden" accept="image/*" onchange="handleScamImageUpload(event)">
+                                </div>
+                                <img id="scam-image-preview" class="hidden w-full h-32 object-contain mt-2 rounded-lg border border-white/10">
+                            </div>
+                        </div>
+
+                        <!-- Scam Result Area -->
+                        <div id="scam-result-area" class="mt-6 bg-cardBg border border-white/10 rounded-2xl p-6 hidden">
+                            <div class="flex items-center gap-3 mb-4 border-b border-white/5 pb-4">
+                                <div id="scam-icon" class="w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold"></div>
+                                <div>
+                                    <h4 class="font-bold text-lg" id="scam-title">Analysis Result</h4>
+                                    <p class="text-sm text-gray-400" id="scam-confidence"></p>
+                                </div>
+                            </div>
+                            <p class="text-sm text-gray-300 leading-relaxed" id="scam-explanation"></p>
+                        </div>
+                    </div>
+
+                    <!-- 4. Smart Alerts -->
+                    <div id="view-alerts" class="view-section max-w-3xl mx-auto">
+                        <h2 class="text-2xl font-bold mb-6">Smart Alerts</h2>
+                        <div class="space-y-4" id="alerts-list">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+
+                    <!-- 5. Scholarships & Jobs -->
+                    <div id="view-jobs" class="view-section">
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-2xl font-bold">Jobs & Scholarships</h2>
+                            <div class="flex gap-2">
+                                <button id="job-btn-All" onclick="setJobFilter('All')" class="bg-primary/20 text-primary border border-primary/50 px-4 py-1.5 rounded-full text-sm transition">All</button>
+                                <button id="job-btn-Job" onclick="setJobFilter('Job')" class="bg-cardBg border border-white/10 px-4 py-1.5 rounded-full text-sm text-gray-400 hover:text-white transition">Jobs</button>
+                                <button id="job-btn-Scholarship" onclick="setJobFilter('Scholarship')" class="bg-cardBg border border-white/10 px-4 py-1.5 rounded-full text-sm text-gray-400 hover:text-white transition">Scholarships</button>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6" id="jobs-grid">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+
+                    <!-- 6. Nearby GPS -->
+                    <div id="view-gps" class="view-section h-full flex flex-col">
+                        <h2 class="text-2xl font-bold mb-2">Location Services</h2>
+                        <p class="text-gray-400 text-sm mb-4">Find nearby government offices, hospitals, and centers.</p>
+                        
+                        <div class="flex gap-3 mb-6 overflow-x-auto pb-2 custom-scrollbar">
+                            <button onclick="findNearby('Hospitals')" class="shrink-0 bg-panelBg border border-white/10 px-4 py-2 rounded-xl text-sm flex items-center gap-2 hover:border-primary transition"><i class="fa-solid fa-hospital text-red-400"></i> Hospitals</button>
+                            <button onclick="findNearby('Police')" class="shrink-0 bg-panelBg border border-white/10 px-4 py-2 rounded-xl text-sm flex items-center gap-2 hover:border-primary transition"><i class="fa-solid fa-shield text-blue-400"></i> Police Stations</button>
+                            <button onclick="findNearby('Govt Office')" class="shrink-0 bg-panelBg border border-white/10 px-4 py-2 rounded-xl text-sm flex items-center gap-2 hover:border-primary transition"><i class="fa-solid fa-building text-gray-400"></i> Govt Offices</button>
+                            <button onclick="findNearby('Skill Center')" class="shrink-0 bg-panelBg border border-white/10 px-4 py-2 rounded-xl text-sm flex items-center gap-2 hover:border-primary transition"><i class="fa-solid fa-laptop-code text-green-400"></i> Skill Centers</button>
+                        </div>
+
+                        <div class="flex-1 bg-cardBg border border-white/10 rounded-2xl p-4 flex flex-col items-center justify-center text-center relative overflow-hidden">
+                            <!-- Mock Map Background -->
+                            <div class="absolute inset-0 opacity-10" style="background-image: radial-gradient(#d946ef 1px, transparent 1px); background-size: 20px 20px;"></div>
+                            
+                            <div id="gps-status" class="z-10">
+                                <i class="fa-solid fa-location-dot text-5xl text-primary mb-4 animate-bounce"></i>
+                                <h3 class="text-xl font-bold mb-2">Locating...</h3>
+                                <p class="text-sm text-gray-400 max-w-md">Please allow location access to find services near you.</p>
+                                <button onclick="initGPS()" class="mt-6 bg-white/10 border border-white/20 px-6 py-2 rounded-lg text-sm hover:bg-white/20 transition">Enable GPS</button>
+                            </div>
+                            
+                            <div id="gps-results" class="z-10 hidden w-full h-full flex-col">
+                                <div class="text-left mb-4">
+                                    <h3 class="font-bold text-lg text-primary" id="gps-search-title">Nearby Hospitals</h3>
+                                    <p class="text-xs text-gray-400" id="gps-coords">Lat: --, Lng: --</p>
+                                </div>
+                                <div class="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar" id="gps-list">
+                                    <!-- Populated JS -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 7. Skills & Education -->
+                    <div id="view-skills" class="view-section">
+                        <div class="mb-8 bg-cardBg border border-white/10 rounded-2xl p-6 relative overflow-hidden">
+                            <div class="absolute right-0 top-0 w-64 h-64 bg-primary/20 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2"></div>
+                            <h2 class="text-3xl font-bold mb-2 relative z-10">AI Skill Recommendations</h2>
+                            <p class="text-gray-400 text-sm mb-6 relative z-10">Tell AI what you want to learn. We have over 50+ free certified courses.</p>
+                            
+                            <div class="relative flex items-center max-w-2xl z-10">
+                                <i class="fa-solid fa-magnifying-glass absolute left-4 text-gray-400"></i>
+                                <input type="text" id="skill-search-input" onkeyup="filterCoursesBySearch()" class="w-full bg-panelBg border border-white/10 rounded-xl py-4 pl-12 pr-4 text-white placeholder-gray-500 focus:outline-none focus:border-primary transition" placeholder="E.g. 'I want to learn coding' or 'Farming techniques'">
+                            </div>
+                        </div>
+                        
+                        <div class="flex flex-col md:flex-row gap-4 mb-8">
+                            <button id="skill-cat-Tech" onclick="filterCoursesByCategory('Tech')" class="flex-1 bg-gradient-to-br from-blue-900/50 to-blue-800/20 border border-blue-500/30 p-6 rounded-2xl cursor-pointer hover:border-blue-500 transition text-left relative overflow-hidden group">
+                                <div class="absolute inset-0 bg-blue-500/10 opacity-0 group-hover:opacity-100 transition"></div>
+                                <i class="fa-solid fa-laptop-code text-3xl text-blue-400 mb-3 relative z-10"></i>
+                                <h3 class="font-bold relative z-10">Tech Skills</h3>
+                                <p class="text-xs text-gray-400 mt-1 relative z-10">Coding, Data, IT, Design</p>
+                            </button>
+                            <button id="skill-cat-Non-Tech" onclick="filterCoursesByCategory('Non-Tech')" class="flex-1 bg-gradient-to-br from-purple-900/50 to-purple-800/20 border border-purple-500/30 p-6 rounded-2xl cursor-pointer hover:border-purple-500 transition text-left relative overflow-hidden group">
+                                <div class="absolute inset-0 bg-purple-500/10 opacity-0 group-hover:opacity-100 transition"></div>
+                                <i class="fa-solid fa-user-tie text-3xl text-purple-400 mb-3 relative z-10"></i>
+                                <h3 class="font-bold relative z-10">Non-Tech Skills</h3>
+                                <p class="text-xs text-gray-400 mt-1 relative z-10">Management, Sales, Tailoring</p>
+                            </button>
+                            <button id="skill-cat-Farming" onclick="filterCoursesByCategory('Farming')" class="flex-1 bg-gradient-to-br from-orange-900/50 to-orange-800/20 border border-orange-500/30 p-6 rounded-2xl cursor-pointer hover:border-orange-500 transition text-left relative overflow-hidden group">
+                                <div class="absolute inset-0 bg-orange-500/10 opacity-0 group-hover:opacity-100 transition"></div>
+                                <i class="fa-solid fa-tractor text-3xl text-orange-400 mb-3 relative z-10"></i>
+                                <h3 class="font-bold relative z-10">General / Farmers</h3>
+                                <p class="text-xs text-gray-400 mt-1 relative z-10">Agriculture, Handicrafts, Trades</p>
+                            </button>
+                            <button id="skill-cat-All" onclick="filterCoursesByCategory('All')" class="hidden md:flex flex-col justify-center items-center px-6 bg-cardBg border border-white/10 rounded-2xl hover:bg-white/5 transition">
+                                <i class="fa-solid fa-border-all text-xl text-gray-400 mb-2"></i>
+                                <span class="text-xs font-bold text-gray-400">Show All</span>
+                            </button>
+                        </div>
+
+                        <div class="flex justify-between items-end mb-4 border-b border-white/10 pb-2">
+                            <h3 class="font-semibold text-lg" id="course-list-title">All Certified Courses</h3>
+                            <span class="text-sm text-primary font-bold" id="course-count">50 Courses</span>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6" id="skills-grid">
+                            <!-- Populated JS -->
+                        </div>
+                    </div>
+
+                    <!-- 8. Document Assistant -->
+                    <div id="view-documents" class="view-section max-w-5xl mx-auto">
+                        <div class="flex justify-between items-start mb-6">
+                            <div>
+                                <h2 class="text-2xl font-bold mb-1">Form Guidance & Document Assistant</h2>
+                                <p class="text-sm text-gray-400">Secure digital locker. Upload once, AI will auto-fill your forms everywhere.</p>
+                            </div>
+                            <button onclick="document.getElementById('doc-upload-input').click()" class="gradient-bg text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-lg hover:opacity-90 transition flex items-center gap-2">
+                                <i class="fa-solid fa-plus"></i> Add Document
+                            </button>
+                            <input type="file" id="doc-upload-input" class="hidden" accept="image/*,.pdf" onchange="handleDocumentUpload(event)">
+                        </div>
+
+                        <!-- AI Auto Fill Banner -->
+                        <div class="bg-primary/10 border border-primary/30 rounded-xl p-4 mb-8 flex items-start gap-4">
+                            <div class="mt-1 w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary shrink-0">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-sm text-primary">AI Auto-Extraction Active</h4>
+                                <p class="text-xs text-gray-300 mt-1">Upload ID cards (Aadhaar, PAN, Voter ID). Our AI will read the details automatically to check eligibility and fill forms instantly.</p>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4" id="documents-grid">
+                            <!-- Populated JS -->
+                        </div>
+
+                        <!-- Scan Result Modal inside view -->
+                        <div id="doc-scan-result" class="hidden mt-8 bg-panelBg border border-white/10 rounded-2xl p-6">
+                            <h3 class="font-bold mb-4 border-b border-white/10 pb-2"><i class="fa-solid fa-file-invoice text-primary"></i> Extracted Data</h3>
+                            <div id="doc-extracted-data" class="grid grid-cols-2 gap-4 text-sm">
+                                <!-- Populated JS -->
+                            </div>
+                            <button onclick="saveExtractedDoc()" class="mt-4 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded text-sm transition w-full">Save to Locker</button>
+                        </div>
+                    </div>
+
+                    <!-- 9. Emergency SOS -->
+                    <div id="view-emergency" class="view-section max-w-4xl mx-auto">
+                        <div class="bg-red-500/10 border border-red-500/30 rounded-2xl p-8 text-center mb-8">
+                            <div class="w-20 h-20 bg-red-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-[0_0_30px_rgba(220,38,38,0.5)] animate-pulse">
+                                <i class="fa-solid fa-triangle-exclamation text-4xl text-white"></i>
+                            </div>
+                            <h2 class="text-3xl font-bold text-red-500 mb-2">EMERGENCY SOS</h2>
+                            <p class="text-gray-300">Tap any number to call immediately.</p>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="emergency-grid">
+                            <!-- Populated JS -->
+                        </div>
+                    </div>
+
+                    <!-- 11. ADMIN DASHBOARD -->
+                    <div id="view-admin" class="view-section h-full flex flex-col">
+                        <div class="flex justify-between items-center mb-6">
+                            <div>
+                                <h2 class="text-3xl font-bold text-white">Admin Command Center</h2>
+                                <p class="text-gray-400 text-sm mt-1">Manage citizens, view their applications, and system status.</p>
+                            </div>
+                            <button class="bg-cardBg border border-white/10 hover:bg-white/5 px-4 py-2 rounded-xl text-sm transition flex items-center gap-2">
+                                <i class="fa-solid fa-download"></i> Export Data
+                            </button>
+                        </div>
+
+                        <!-- Admin Stats -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-8 text-center">
+                            <div class="bg-panelBg border border-white/5 p-5 rounded-2xl relative overflow-hidden">
+                                <div class="absolute -right-4 -top-4 w-16 h-16 bg-blue-500/20 rounded-full blur-xl"></div>
+                                <div class="text-3xl font-bold text-blue-400 mb-1" id="admin-stat-users">3</div>
+                                <div class="text-xs text-gray-400 font-semibold uppercase tracking-wider">Registered Citizens</div>
+                            </div>
+                            <div class="bg-panelBg border border-white/5 p-5 rounded-2xl relative overflow-hidden">
+                                <div class="absolute -right-4 -top-4 w-16 h-16 bg-purple-500/20 rounded-full blur-xl"></div>
+                                <div class="text-3xl font-bold text-purple-400 mb-1" id="admin-stat-apps">3</div>
+                                <div class="text-xs text-gray-400 font-semibold uppercase tracking-wider">Total Applications</div>
+                            </div>
+                            <div class="bg-panelBg border border-white/5 p-5 rounded-2xl relative overflow-hidden">
+                                <div class="absolute -right-4 -top-4 w-16 h-16 bg-yellow-500/20 rounded-full blur-xl"></div>
+                                <div class="text-3xl font-bold text-yellow-400 mb-1" id="admin-stat-pending">1</div>
+                                <div class="text-xs text-gray-400 font-semibold uppercase tracking-wider">Pending Review</div>
+                            </div>
+                            <div class="bg-panelBg border border-white/5 p-5 rounded-2xl relative overflow-hidden">
+                                <div class="absolute -right-4 -top-4 w-16 h-16 bg-green-500/20 rounded-full blur-xl"></div>
+                                <div class="text-3xl font-bold text-green-400 mb-1">Active</div>
+                                <div class="text-xs text-gray-400 font-semibold uppercase tracking-wider">AI Uptime</div>
+                            </div>
+                        </div>
+
+                        <!-- Two Column Layout for Admin -->
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
+                            <!-- Left: Users List -->
+                            <div class="bg-cardBg border border-white/5 rounded-2xl p-6 flex flex-col col-span-1">
+                                <h3 class="font-bold text-lg mb-4 flex items-center gap-2 border-b border-white/5 pb-3">
+                                    <i class="fa-solid fa-users text-secondary"></i> Registered Users
+                                </h3>
+                                <div class="flex-1 overflow-y-auto custom-scrollbar space-y-3" id="admin-users-list">
+                                    <!-- Populated by JS -->
+                                </div>
+                            </div>
+
+                            <!-- Right: Applications -->
+                            <div class="bg-cardBg border border-white/5 rounded-2xl p-6 flex flex-col col-span-1 lg:col-span-2">
+                                <h3 class="font-bold text-lg mb-4 flex items-center gap-2 border-b border-white/5 pb-3">
+                                    <i class="fa-solid fa-list-check text-primary"></i> Applications Overview
+                                </h3>
+                                <div class="flex-1 overflow-y-auto custom-scrollbar">
+                                    <table class="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr class="text-xs text-gray-400 uppercase tracking-wider border-b border-white/10 bg-white/5">
+                                                <th class="p-3 rounded-tl-lg">Applicant Name</th>
+                                                <th class="p-3">Applied For</th>
+                                                <th class="p-3">Status</th>
+                                                <th class="p-3 rounded-tr-lg text-right">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="admin-applications-table" class="text-sm divide-y divide-white/5">
+                                            <!-- Populated by JS -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Application Modal Overlay for Apply buttons (Appears on TOP of the Feature Window) -->
+    <div id="apply-modal" class="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+        <div class="bg-panelBg border border-white/10 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="p-5 border-b border-white/10 flex justify-between items-center bg-darkBg relative overflow-hidden">
+                <div class="absolute inset-0 bg-gradient-to-r from-primary/20 to-transparent opacity-50"></div>
+                <div class="relative z-10 flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-robot"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-lg text-white tracking-wide" id="modal-title">AI Application Wizard</h3>
+                        <p class="text-xs text-primary" id="modal-step-indicator">Step 1 of 3: Details</p>
+                    </div>
+                </div>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-white relative z-10 w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center transition"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            
+            <!-- Dynamic Content Area -->
+            <div id="wizard-body" class="p-6 overflow-y-auto flex-1 custom-scrollbar min-h-[300px]">
+                <!-- Injected via JS -->
+            </div>
+
+            <div id="wizard-footer" class="p-4 border-t border-white/10 bg-darkBg flex justify-between gap-3 items-center">
+                <!-- Injected via JS -->
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ================= JAVASCRIPT LOGIC ================= -->
+    <script>
+        // --- 1. CONFIG & STATE ---
+        const API_KEY = ""; // Gemini API Key injected by environment
+        let currentUser = null;
+        let currentLang = 'en-IN';
+        let currentState = 'All';
+        let isListening = false;
+        
+        // Navigation config mapping ids to icons and titles
+        const userNavItems = [
+            { id: 'assistant', title: '1. Voice Assistant', icon: 'fa-microphone' },
+            { id: 'schemes', title: '2. Govt Schemes', icon: 'fa-landmark' },
+            { id: 'scam', title: '3. Scam Detector', icon: 'fa-shield-halved' },
+            { id: 'alerts', title: '4. Smart Alerts', icon: 'fa-bell' },
+            { id: 'jobs', title: '5. Scholarships & Jobs', icon: 'fa-briefcase' },
+            { id: 'gps', title: '6. Nearby GPS', icon: 'fa-location-dot' },
+            { id: 'skills', title: '7. Skills', icon: 'fa-graduation-cap' },
+            { id: 'documents', title: '8. Form Guidance', icon: 'fa-file-lines' },
+            { id: 'emergency', title: '9. Emergency SOS', icon: 'fa-phone-volume', textClass: 'text-red-400' }
+        ];
+
+        const adminNavItems = [
+            { id: 'admin', title: 'Dashboard Overview', icon: 'fa-chart-pie' },
+            { id: 'scam', title: 'AI Fraud Monitoring', icon: 'fa-shield-halved' },
+            { id: 'schemes', title: 'Manage Schemes DB', icon: 'fa-database' }
+        ];
+
+        // Auth Databases
+        const usersDB = [
+            { email: 'admin@india.gov', pass: 'admin123', name: 'System Admin', role: 'admin' },
+            { email: 'citizen@india.gov', pass: 'password123', name: 'Citizen India', role: 'user' },
+            { email: 'rahul@mail.com', pass: 'pass', name: 'Rahul Kumar', role: 'user' }
+        ];
+
+        const adminApplicationsDB = [
+            { id: 1001, user: 'Rahul Kumar', title: 'Indian Army Agniveer', date: '2026-03-08', confidence: 95, status: 'Approved' },
+            { id: 1002, user: 'Priya Sharma', title: 'PM Kisan Samman Nidhi', date: '2026-03-07', confidence: 42, status: 'Rejected' },
+            { id: 1003, user: 'Amit Patel', title: 'Sukanya Samriddhi Yojana', date: '2026-03-06', confidence: 88, status: 'Pending' }
+        ];
+
+        // Mock Databases
+        const schemesDB = [
+            { id: 1, title: "PM Kisan Samman Nidhi", desc: "Financial support of ₹6000/year for farmers. Must be a landholding farmer.", state: "All", tags: ["Agriculture", "Finance"], docs: ["Aadhaar Card", "Bank Passbook", "Land Record"] },
+            { id: 2, title: "Ayushman Bharat (PM-JAY)", desc: "Health insurance cover of up to ₹5 lakhs for low-income families listed in SECC 2011.", state: "All", tags: ["Health"], docs: ["Aadhaar Card", "Ration Card", "Income Certificate"] },
+            { id: 3, title: "Stand-Up India", desc: "Bank loans between ₹10 lakh and ₹1 Crore for SC/ST or Women entrepreneurs.", state: "All", tags: ["Business", "Women"], docs: ["Aadhaar Card", "Business Plan", "Caste Certificate"] },
+            { id: 4, title: "Sukanya Samriddhi Yojana", desc: "Savings scheme for girl child education and marriage. For girls below 10 years.", state: "All", tags: ["Women", "Finance"], docs: ["Aadhaar Card", "Child Birth Certificate", "Address Proof"] },
+            { id: 5, title: "Pradhan Mantri Awas Yojana", desc: "Housing for All scheme offering interest subsidies for EWS/LIG families.", state: "All", tags: ["Housing"], docs: ["Aadhaar Card", "Income Certificate", "Bank Passbook"] },
+            { id: 6, title: "Gruha Lakshmi Scheme", desc: "Financial aid of ₹2000/month for women head of the family.", state: "Karnataka", tags: ["Women", "State"], docs: ["Aadhaar Card", "Ration Card", "Bank Passbook"] },
+            { id: 7, title: "YSR Pension Kanuka", desc: "Monthly pension for elderly, widows, weavers, and disabled.", state: "Andhra Pradesh", tags: ["Pension", "State"], docs: ["Aadhaar Card", "Age Proof", "Income Certificate"] },
+            { id: 8, title: "Mukhyamantri Majhi Ladki Bahin", desc: "Monthly financial aid of ₹1500 for eligible women.", state: "Maharashtra", tags: ["Women", "State"], docs: ["Aadhaar Card", "Domicile Certificate", "Bank Passbook"] },
+            { id: 9, title: "Anna Bhagya Yojana", desc: "Free rice distribution (10kg per person) for BPL families.", state: "Karnataka", tags: ["Food", "State"], docs: ["Aadhaar Card", "BPL Ration Card"] },
+            { id: 10, title: "Delhi Free WiFi", desc: "Free public WiFi access up to 15GB data per month.", state: "Delhi", tags: ["Tech", "State"], docs: ["Aadhaar Card", "Delhi Voter ID"] },
+            { id: 11, title: "PM Shram Yogi Maandhan", desc: "Pension scheme for unorganized sector workers.", state: "All", tags: ["Pension", "Labour"], docs: ["Aadhaar Card", "Bank Passbook"] },
+            { id: 12, title: "PM Mudra Yojana", desc: "Loans up to ₹10 lakh for non-corporate, non-farm small/micro enterprises.", state: "All", tags: ["Business", "Finance"], docs: ["Aadhaar Card", "Business Registration", "Bank Statement"] },
+            { id: 13, title: "PM Jeevan Jyoti Bima Yojana", desc: "Life insurance scheme of ₹2 lakhs for individuals aged 18-50 years.", state: "All", tags: ["Insurance"], docs: ["Aadhaar Card", "Bank Passbook"] },
+            { id: 14, title: "Atal Pension Yojana", desc: "Guaranteed minimum pension for citizens primarily in unorganized sectors.", state: "All", tags: ["Pension"], docs: ["Aadhaar Card", "Bank Passbook"] },
+            { id: 15, title: "PM Ujjwala Yojana", desc: "Free LPG connections for women of BPL families.", state: "All", tags: ["Women", "Energy"], docs: ["Aadhaar Card", "BPL Ration Card", "Bank Passbook"] },
+            { id: 16, title: "MGNREGA", desc: "Guarantees 100 days of wage employment in a financial year.", state: "All", tags: ["Employment", "Rural"], docs: ["Aadhaar Card", "Job Card", "Bank Passbook"] },
+            { id: 17, title: "PM Fasal Bima Yojana", desc: "Crop insurance scheme for farmers.", state: "All", tags: ["Agriculture", "Insurance"], docs: ["Aadhaar Card", "Land Record", "Sowing Certificate"] },
+            { id: 18, title: "PM Matru Vandana Yojana", desc: "Maternity benefit program providing ₹5,000 for first living child.", state: "All", tags: ["Women", "Health"], docs: ["Aadhaar Card", "Bank Passbook", "MCP Card"] },
+            { id: 19, title: "Kanyashree Prakalpa", desc: "Improves life/status of girls by incentivizing education.", state: "West Bengal", tags: ["Women", "Education"], docs: ["Aadhaar Card", "Birth Certificate", "Institution Certificate"] },
+            { id: 20, title: "Rythu Bandhu", desc: "Investment support scheme for farmers.", state: "Telangana", tags: ["Agriculture", "State"], docs: ["Aadhaar Card", "Pattadar Passbook", "Bank Passbook"] },
+            { id: 21, title: "KALIA Scheme", desc: "Krushak Assistance for Livelihood and Income Augmentation.", state: "Odisha", tags: ["Agriculture", "State"], docs: ["Aadhaar Card", "Land Record", "Bank Passbook"] },
+            { id: 22, title: "Amma Vodi", desc: "Financial assistance to mothers for educating their children.", state: "Andhra Pradesh", tags: ["Education", "State"], docs: ["Aadhaar Card", "White Ration Card", "School ID"] },
+            { id: 23, title: "Dalit Bandhu", desc: "Empowerment scheme providing ₹10 lakh per SC family.", state: "Telangana", tags: ["Social Welfare", "State"], docs: ["Aadhaar Card", "Caste Certificate", "Bank Passbook"] },
+            { id: 24, title: "CM Comprehensive Health Insurance", desc: "Health insurance for low-income families in TN.", state: "Tamil Nadu", tags: ["Health", "State"], docs: ["Aadhaar Card", "Income Certificate", "Ration Card"] },
+            { id: 25, title: "LIFE Mission", desc: "Comprehensive housing scheme for all landless and homeless.", state: "Kerala", tags: ["Housing", "State"], docs: ["Aadhaar Card", "Income Certificate", "Ration Card"] },
+            { id: 26, title: "Chiranjeevi Yojana", desc: "Universal health scheme providing cashless treatment up to ₹25 lakh.", state: "Rajasthan", tags: ["Health", "State"], docs: ["Aadhaar Card", "Jan Aadhaar Card"] },
+            { id: 27, title: "Mukhyamantri Kanya Sumangala", desc: "Financial aid for girl child at different stages of life.", state: "Uttar Pradesh", tags: ["Women", "State"], docs: ["Aadhaar Card", "Birth Certificate", "Income Certificate"] },
+            { id: 28, title: "Bhavantar Bhugtan Yojana", desc: "Direct benefit transfer scheme for farmers selling below MSP.", state: "Madhya Pradesh", tags: ["Agriculture", "State"], docs: ["Aadhaar Card", "Bank Passbook", "Crop Registration"] },
+            { id: 29, title: "Arundhati Gold Scheme", desc: "Provides 1 tola gold to brides of economically weaker sections.", state: "Assam", tags: ["Women", "State"], docs: ["Aadhaar Card", "Marriage Registration", "Income Certificate"] },
+            { id: 30, title: "Mukhya Mantri Parivar Samridhi", desc: "Social security scheme providing ₹6000 per year.", state: "Haryana", tags: ["Social Welfare", "State"], docs: ["Aadhaar Card", "Parivar Pehchan Patra", "Bank Passbook"] }
+        ];
+
+        const jobsDB = [
+            { id: 201, title: "Indian Army Agniveer", desc: "Join the Armed Forces. 10th/12th Pass.", type: "Job", tags: ["Defense"], docs: ["Aadhaar Card", "10th Marksheet", "Physical Fitness Certificate"] },
+            { id: 202, title: "SSC CGL Recruitment", desc: "Staff Selection Commission Group B/C Officers.", type: "Job", tags: ["Admin"], docs: ["Aadhaar Card", "Degree Certificate", "Category Certificate"] },
+            { id: 203, title: "SSC CHSL (10+2)", desc: "Combined Higher Secondary Level for Clerks/LDC.", type: "Job", tags: ["Clerical"], docs: ["Aadhaar Card", "12th Marksheet"] },
+            { id: 204, title: "RRB NTPC", desc: "Railway Recruitment Board Non-Technical (Clerks, Station Master).", type: "Job", tags: ["Railways"], docs: ["Aadhaar Card", "Degree Certificate"] },
+            { id: 205, title: "SBI Probationary Officer", desc: "Entry level officer role in State Bank of India.", type: "Job", tags: ["Banking"], docs: ["Aadhaar Card", "Degree Certificate", "PAN Card"] },
+            { id: 206, title: "IBPS Clerk", desc: "Clerical cadre recruitment in public sector banks.", type: "Job", tags: ["Banking"], docs: ["Aadhaar Card", "Degree Certificate"] },
+            { id: 207, title: "UPSC Civil Services", desc: "Premier administrative civil services (IAS/IPS).", type: "Job", tags: ["Admin"], docs: ["Aadhaar Card", "Degree Certificate", "Age Proof"] },
+            { id: 208, title: "State Police Constable", desc: "Constable recruitment for state police departments.", type: "Job", tags: ["Defense"], docs: ["Aadhaar Card", "12th Marksheet", "Physical Fitness Certificate"] },
+            { id: 209, title: "Gramin Dak Sevak (GDS)", desc: "Branch Postmaster and assistant roles in rural post offices.", type: "Job", tags: ["Postal"], docs: ["Aadhaar Card", "10th Marksheet", "Computer Certificate"] },
+            { id: 210, title: "Indian Navy MR/SSR", desc: "Sailors for Matric Recruit and Senior Secondary Recruit.", type: "Job", tags: ["Defense"], docs: ["Aadhaar Card", "12th Marksheet", "Domicile Certificate"] },
+            { id: 211, title: "Air Force Group X/Y", desc: "Airmen in technical and non-technical trades.", type: "Job", tags: ["Defense"], docs: ["Aadhaar Card", "12th Marksheet", "Medical Certificate"] },
+            { id: 212, title: "KVS Primary Teacher", desc: "Teaching jobs in Kendriya Vidyalaya schools.", type: "Job", tags: ["Education"], docs: ["Aadhaar Card", "B.Ed Degree", "CTET Certificate"] },
+            { id: 213, title: "DRDO CEPTAM", desc: "Senior Technical Assistant and Technician recruitment.", type: "Job", tags: ["Technical"], docs: ["Aadhaar Card", "Diploma/ITI Certificate"] },
+            { id: 214, title: "ISRO Assistant", desc: "Assistants and Upper Division Clerks at ISRO.", type: "Job", tags: ["Admin", "Space"], docs: ["Aadhaar Card", "Degree Certificate"] },
+            { id: 215, title: "LIC AAO", desc: "Assistant Administrative Officer in Life Insurance Corp.", type: "Job", tags: ["Insurance"], docs: ["Aadhaar Card", "Degree Certificate"] },
+            { id: 216, title: "Post-Matric Scholarship", desc: "Financial aid for higher education of students in Class 11 and above.", type: "Scholarship", tags: ["Education"], docs: ["Aadhaar Card", "Income Certificate", "10th Marksheet"] },
+            { id: 217, title: "Pre-Matric Scholarship", desc: "Scholarship for students from Class 1 to 10.", type: "Scholarship", tags: ["Education"], docs: ["Aadhaar Card", "Income Certificate", "School ID"] },
+            { id: 218, title: "National Means Cum Merit", desc: "Scholarship for economically weaker sections (Class 8 pass).", type: "Scholarship", tags: ["Education"], docs: ["Aadhaar Card", "Income Certificate", "7th Marksheet"] },
+            { id: 219, title: "Pragati Scholarship for Girls", desc: "AICTE scholarship for girl students in technical education.", type: "Scholarship", tags: ["Women", "Tech"], docs: ["Aadhaar Card", "Admission Letter", "Income Certificate"] },
+            { id: 220, title: "Saksham Scholarship", desc: "AICTE scholarship for specially abled students.", type: "Scholarship", tags: ["Disability", "Tech"], docs: ["Aadhaar Card", "Disability Certificate", "Income Certificate"] },
+            { id: 221, title: "Swami Vivekananda Merit Cum Means", desc: "Scholarship for meritorious students in West Bengal.", type: "Scholarship", tags: ["Merit", "State"], docs: ["Aadhaar Card", "Income Certificate", "Previous Year Marksheet"] },
+            { id: 222, title: "INSPIRE Scholarship", desc: "Innovation in Science Pursuit for Inspired Research by DST.", type: "Scholarship", tags: ["Science"], docs: ["Aadhaar Card", "12th Marksheet", "College ID"] },
+            { id: 223, title: "PM YASASVI Scholarship", desc: "For OBC, EBC and DNT students to study in top schools.", type: "Scholarship", tags: ["Education"], docs: ["Aadhaar Card", "Category Certificate", "Income Certificate"] },
+            { id: 224, title: "AICTE Swanath Scholarship", desc: "For orphans, wards of martyrs, and COVID-affected families.", type: "Scholarship", tags: ["Support"], docs: ["Aadhaar Card", "Death Certificate", "Income Certificate"] },
+            { id: 225, title: "Begum Hazrat Mahal National Scholarship", desc: "For meritorious girl students belonging to minority communities.", type: "Scholarship", tags: ["Women", "Minority"], docs: ["Aadhaar Card", "Income Certificate", "Minority Certificate"] },
+            { id: 226, title: "Central Sector Scheme of Scholarships", desc: "For college and university students by MHRD.", type: "Scholarship", tags: ["Higher Ed"], docs: ["Aadhaar Card", "12th Marksheet", "Income Certificate"] },
+            { id: 227, title: "Vidyadhan Scholarship", desc: "Sponsorship for brilliant students from economically challenged families.", type: "Scholarship", tags: ["Merit"], docs: ["Aadhaar Card", "10th Marksheet", "Income Certificate"] },
+            { id: 228, title: "HDFC Educational Crisis Scholarship", desc: "Support for students whose families are facing personal/economic crisis.", type: "Scholarship", tags: ["Support"], docs: ["Aadhaar Card", "Crisis Proof", "Previous Year Marksheet"] },
+            { id: 229, title: "Foundation For Excellence (FFE)", desc: "For students pursuing Engineering or Medical degrees.", type: "Scholarship", tags: ["Engineering", "Medical"], docs: ["Aadhaar Card", "Entrance Exam Rank", "Income Certificate"] },
+            { id: 230, title: "ONGC Merit Scholarship", desc: "For SC/ST/OBC and General candidates pursuing professional courses.", type: "Scholarship", tags: ["Professional"], docs: ["Aadhaar Card", "Caste Certificate", "Admission Letter"] }
+        ];
+
+        // NEW 50 COURSES DB
+        const coursesDB = [
+            // --- TECH (17 Courses) ---
+            { id: 301, title: "Basic Computer Literacy", provider: "PMGDISHA", duration: "20 Hrs", type: "Tech", icon: "fa-computer", color: "from-blue-600 to-blue-900" },
+            { id: 302, title: "Python Programming Basics", provider: "Skill India", duration: "40 Hrs", type: "Tech", icon: "fa-python", color: "from-blue-500 to-indigo-800" },
+            { id: 303, title: "Web Development (HTML/CSS)", provider: "NSDC", duration: "60 Hrs", type: "Tech", icon: "fa-code", color: "from-indigo-600 to-purple-900" },
+            { id: 304, title: "Data Entry Operator", provider: "NIELIT", duration: "30 Hrs", type: "Tech", icon: "fa-keyboard", color: "from-blue-400 to-blue-700" },
+            { id: 305, title: "Mobile Repair Technician", provider: "PMKVY", duration: "90 Hrs", type: "Tech", icon: "fa-mobile-screen", color: "from-cyan-600 to-blue-900" },
+            { id: 306, title: "Digital Marketing Fundamentals", provider: "Skill India", duration: "45 Hrs", type: "Tech", icon: "fa-bullhorn", color: "from-indigo-500 to-purple-800" },
+            { id: 307, title: "Cyber Security Awareness", provider: "CERT-In", duration: "15 Hrs", type: "Tech", icon: "fa-shield-halved", color: "from-blue-700 to-gray-900" },
+            { id: 308, title: "Advanced Excel for Business", provider: "NSDC", duration: "30 Hrs", type: "Tech", icon: "fa-file-excel", color: "from-green-600 to-emerald-900" },
+            { id: 309, title: "Hardware and Networking", provider: "NIELIT", duration: "80 Hrs", type: "Tech", icon: "fa-network-wired", color: "from-slate-600 to-slate-900" },
+            { id: 310, title: "Graphic Design Basics", provider: "Skill India", duration: "50 Hrs", type: "Tech", icon: "fa-bezier-curve", color: "from-fuchsia-600 to-pink-900" },
+            { id: 311, title: "Cloud Computing Intro", provider: "NASSCOM", duration: "40 Hrs", type: "Tech", icon: "fa-cloud", color: "from-sky-500 to-blue-800" },
+            { id: 312, title: "AI and Machine Learning 101", provider: "NPTEL", duration: "60 Hrs", type: "Tech", icon: "fa-brain", color: "from-violet-600 to-purple-900" },
+            { id: 313, title: "IoT (Internet of Things)", provider: "Skill India", duration: "45 Hrs", type: "Tech", icon: "fa-wifi", color: "from-teal-500 to-emerald-800" },
+            { id: 314, title: "C++ Programming", provider: "NIELIT", duration: "50 Hrs", type: "Tech", icon: "fa-c", color: "from-blue-600 to-indigo-900" },
+            { id: 315, title: "UI/UX Design Concepts", provider: "NSDC", duration: "40 Hrs", type: "Tech", icon: "fa-pen-nib", color: "from-pink-500 to-rose-800" },
+            { id: 316, title: "Database Administration", provider: "NASSCOM", duration: "70 Hrs", type: "Tech", icon: "fa-database", color: "from-slate-500 to-gray-800" },
+            { id: 317, title: "Software Testing & QA", provider: "Skill India", duration: "55 Hrs", type: "Tech", icon: "fa-bug", color: "from-red-500 to-rose-900" },
+
+            // --- NON-TECH (17 Courses) ---
+            { id: 401, title: "Retail Sales Management", provider: "PMKVY", duration: "60 Hrs", type: "Non-Tech", icon: "fa-shop", color: "from-purple-600 to-purple-900" },
+            { id: 402, title: "Spoken English & Comm.", provider: "Skill India", duration: "40 Hrs", type: "Non-Tech", icon: "fa-comments", color: "from-pink-500 to-rose-800" },
+            { id: 403, title: "Basic Accounting & Tally", provider: "NSDC", duration: "80 Hrs", type: "Non-Tech", icon: "fa-calculator", color: "from-violet-500 to-purple-800" },
+            { id: 404, title: "Beauty and Wellness", provider: "PMKVY", duration: "120 Hrs", type: "Non-Tech", icon: "fa-spa", color: "from-rose-400 to-pink-700" },
+            { id: 405, title: "Tailoring and Dress Design", provider: "Skill India", duration: "150 Hrs", type: "Non-Tech", icon: "fa-scissors", color: "from-fuchsia-500 to-purple-800" },
+            { id: 406, title: "Hospitality and Catering", provider: "NSDC", duration: "90 Hrs", type: "Non-Tech", icon: "fa-bell-concierge", color: "from-orange-500 to-red-800" },
+            { id: 407, title: "Tourism Guide Training", provider: "Min of Tourism", duration: "60 Hrs", type: "Non-Tech", icon: "fa-map-location-dot", color: "from-amber-500 to-orange-800" },
+            { id: 408, title: "Customer Service Executive", provider: "PMKVY", duration: "45 Hrs", type: "Non-Tech", icon: "fa-headset", color: "from-purple-500 to-indigo-800" },
+            { id: 409, title: "Event Management Basics", provider: "Skill India", duration: "50 Hrs", type: "Non-Tech", icon: "fa-calendar-check", color: "from-pink-600 to-rose-900" },
+            { id: 410, title: "Financial Literacy for Micro-biz", provider: "NSDC", duration: "25 Hrs", type: "Non-Tech", icon: "fa-coins", color: "from-yellow-500 to-amber-800" },
+            { id: 411, title: "HR & Payroll Processing", provider: "Skill India", duration: "40 Hrs", type: "Non-Tech", icon: "fa-users", color: "from-violet-600 to-purple-900" },
+            { id: 412, title: "Supply Chain & Logistics", provider: "PMKVY", duration: "70 Hrs", type: "Non-Tech", icon: "fa-truck-fast", color: "from-slate-500 to-gray-800" },
+            { id: 413, title: "Business Communication", provider: "NPTEL", duration: "30 Hrs", type: "Non-Tech", icon: "fa-envelope-open-text", color: "from-indigo-500 to-blue-800" },
+            { id: 414, title: "Entrepreneurship Development", provider: "MSME", duration: "60 Hrs", type: "Non-Tech", icon: "fa-lightbulb", color: "from-amber-400 to-orange-700" },
+            { id: 415, title: "Digital Photography", provider: "Skill India", duration: "50 Hrs", type: "Non-Tech", icon: "fa-camera", color: "from-gray-600 to-slate-900" },
+            { id: 416, title: "Healthcare Assistant", provider: "PMKVY", duration: "180 Hrs", type: "Non-Tech", icon: "fa-user-nurse", color: "from-teal-500 to-emerald-800" },
+            { id: 417, title: "Early Childhood Care", provider: "NSDC", duration: "120 Hrs", type: "Non-Tech", icon: "fa-children", color: "from-rose-500 to-pink-800" },
+
+            // --- GENERAL / FARMERS (16 Courses) ---
+            { id: 501, title: "Modern Organic Farming", provider: "Krishi Vigyan Kendra", duration: "40 Hrs", type: "Farming", icon: "fa-seedling", color: "from-green-600 to-green-900" },
+            { id: 502, title: "Tractor & Farm Machinery Repair", provider: "Skill India", duration: "80 Hrs", type: "Farming", icon: "fa-tractor", color: "from-orange-600 to-red-900" },
+            { id: 503, title: "Dairy Farming Management", provider: "NSDC", duration: "60 Hrs", type: "Farming", icon: "fa-cow", color: "from-amber-600 to-orange-900" },
+            { id: 504, title: "Poultry Farming Techniques", provider: "PMKVY", duration: "45 Hrs", type: "Farming", icon: "fa-egg", color: "from-yellow-600 to-amber-900" },
+            { id: 505, title: "Beekeeping (Apiculture)", provider: "Khadi Board", duration: "30 Hrs", type: "Farming", icon: "fa-bug", color: "from-amber-500 to-orange-800" },
+            { id: 506, title: "Mushroom Cultivation", provider: "Skill India", duration: "25 Hrs", type: "Farming", icon: "fa-leaf", color: "from-emerald-500 to-green-800" },
+            { id: 507, title: "Vermicomposting", provider: "Krishi Vigyan Kendra", duration: "20 Hrs", type: "Farming", icon: "fa-recycle", color: "from-green-500 to-emerald-800" },
+            { id: 508, title: "Drip Irrigation Maintenance", provider: "PMKVY", duration: "30 Hrs", type: "Farming", icon: "fa-droplet", color: "from-cyan-500 to-blue-800" },
+            { id: 509, title: "Solar Pump Installation", provider: "Suryamitra", duration: "90 Hrs", type: "Farming", icon: "fa-solar-panel", color: "from-yellow-500 to-orange-700" },
+            { id: 510, title: "Bamboo Handicrafts", provider: "NSDC", duration: "60 Hrs", type: "Farming", icon: "fa-tree", color: "from-lime-600 to-green-900" },
+            { id: 511, title: "Basic Carpentry", provider: "PMKVY", duration: "100 Hrs", type: "Farming", icon: "fa-hammer", color: "from-orange-700 to-red-900" },
+            { id: 512, title: "Plumbing Basics", provider: "Skill India", duration: "80 Hrs", type: "Farming", icon: "fa-wrench", color: "from-slate-500 to-gray-800" },
+            { id: 513, title: "Domestic Electrician", provider: "NSDC", duration: "120 Hrs", type: "Farming", icon: "fa-plug", color: "from-yellow-600 to-amber-900" },
+            { id: 514, title: "Welding Techniques", provider: "PMKVY", duration: "90 Hrs", type: "Farming", icon: "fa-fire-flame-curved", color: "from-orange-600 to-red-800" },
+            { id: 515, title: "Masonry and Construction", provider: "Skill India", duration: "100 Hrs", type: "Farming", icon: "fa-trowel-bricks", color: "from-stone-500 to-stone-800" },
+            { id: 516, title: "Fisheries & Aquaculture", provider: "NFDB", duration: "60 Hrs", type: "Farming", icon: "fa-fish", color: "from-cyan-600 to-blue-900" }
+        ];
+
+        const documentsDB = [
+            { name: "Aadhaar Card", verified: true, date: "2023-01-15", icon: "fa-id-card" },
+            { name: "Income Certificate", verified: true, date: "2024-02-10", icon: "fa-file-invoice-dollar", alert: true }, // Expiring soon
+            { name: "10th Marksheet", verified: true, date: "2018-06-01", icon: "fa-graduation-cap" }
+        ];
+
+        const emergencyDB = [
+            { name: "National Emergency", number: "112", icon: "fa-triangle-exclamation", color: "bg-red-600" },
+            { name: "Police", number: "100", icon: "fa-shield-halved", color: "bg-blue-600" },
+            { name: "Ambulance", number: "108", icon: "fa-truck-medical", color: "bg-green-600" },
+            { name: "Women Helpline", number: "1091", icon: "fa-person-dress", color: "bg-pink-600" },
+            { name: "Cyber Fraud", number: "1930", icon: "fa-user-secret", color: "bg-purple-600" },
+            { name: "Child Helpline", number: "1098", icon: "fa-child", color: "bg-yellow-600" }
+        ];
+
+        // --- 2. INITIALIZATION & UI SETUP ---
+        document.addEventListener('DOMContentLoaded', () => {
+            renderSchemes();
+            renderJobs();
+            renderDocuments();
+            renderAlerts();
+            filterCoursesByCategory('All'); // Initial render for skills
+            renderEmergency();
+        });
+
+        function renderSidebar() {
+            const nav = document.getElementById('sidebar-nav');
+            const itemsToRender = currentUser?.role === 'admin' ? adminNavItems : userNavItems;
+            
+            nav.innerHTML = itemsToRender.map(item => `
+                <button onclick="switchView('${item.id}')" id="nav-${item.id}" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 text-gray-400 hover:bg-white/5 hover:text-white group">
+                    <i class="fa-solid ${item.icon} w-5 text-center ${item.textClass || 'group-hover:text-primary'}"></i>
+                    <span class="font-medium text-sm ${item.textClass || ''}">${item.title}</span>
+                </button>
+            `).join('');
+            
+            // Highlight assistant by default
+            const assistantNav = document.getElementById('nav-assistant');
+            if(assistantNav) assistantNav.classList.add('bg-white/10', 'text-white', 'border-l-4', 'border-primary');
+        }
+
+        function switchView(viewId) {
+            // Update Sidebar Highlights
+            document.querySelectorAll('[id^="nav-"]').forEach(el => {
+                el.classList.remove('bg-white/10', 'text-white', 'border-l-4', 'border-primary');
+                el.classList.add('text-gray-400');
+            });
+
+            const navItem = document.getElementById(`nav-${viewId}`);
+            if(navItem) {
+                navItem.classList.remove('text-gray-400');
+                navItem.classList.add('bg-white/10', 'text-white', 'border-l-4', 'border-primary');
+            }
+
+            const featureWindow = document.getElementById('feature-window');
+
+            if (viewId === 'assistant') {
+                // CLOSE FEATURE WINDOW, SHOW MAIN DASHBOARD
+                featureWindow.classList.add('opacity-0', 'scale-95');
+                setTimeout(() => {
+                    featureWindow.classList.add('hidden');
+                    featureWindow.classList.remove('flex');
+                }, 300); // Wait for transition
+                document.getElementById('current-view-title').innerText = "VOICE DASHBOARD";
+            } else {
+                // OPEN SEPARATE WINDOW OVERLAY
+                
+                // Hide all sections inside the window
+                document.querySelectorAll('#fw-content .view-section').forEach(el => el.classList.remove('active'));
+                
+                // Show requested view
+                const targetView = document.getElementById(`view-${viewId}`);
+                if(targetView) {
+                    targetView.classList.add('active');
+                }
+
+                // Update Window Title based on Role List
+                const itemsList = currentUser?.role === 'admin' ? adminNavItems : userNavItems;
+                const titleObj = itemsList.find(i => i.id === viewId);
+                if(titleObj) {
+                    const cleanTitle = titleObj.title.replace(/^\d+\.\s*/, '').toUpperCase();
+                    document.getElementById('fw-title').innerText = cleanTitle;
+                    document.getElementById('fw-icon').className = `fa-solid ${titleObj.icon} text-primary`;
+                }
+
+                // Reveal Window
+                featureWindow.classList.remove('hidden');
+                featureWindow.classList.add('flex');
+                setTimeout(() => {
+                    featureWindow.classList.remove('opacity-0', 'scale-95');
+                }, 10);
+            }
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            let colorClass = 'border-primary bg-panelBg text-white';
+            let icon = 'fa-info-circle text-primary';
+            if(type === 'success') { colorClass = 'border-green-500 bg-panelBg text-white'; icon = 'fa-check-circle text-green-500'; }
+            if(type === 'error') { colorClass = 'border-red-500 bg-panelBg text-white'; icon = 'fa-exclamation-circle text-red-500'; }
+
+            toast.className = `flex items-center gap-3 px-4 py-3 rounded-lg border-l-4 shadow-lg transform transition-all duration-300 translate-x-full opacity-0 ${colorClass}`;
+            toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span class="text-sm font-medium">${message}</span>`;
+            
+            container.appendChild(toast);
+            
+            // Animate in
+            setTimeout(() => {
+                toast.classList.remove('translate-x-full', 'opacity-0');
+            }, 10);
+
+            // Remove after 3s
+            setTimeout(() => {
+                toast.classList.add('translate-x-full', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // --- 3. AUTHENTICATION ---
+        function toggleAuthMode() {
+            const login = document.getElementById('login-form');
+            const reg = document.getElementById('register-form');
+            login.classList.toggle('hidden');
+            reg.classList.toggle('hidden');
+        }
+
+        function handleLogin() {
+            const email = document.getElementById('login-email').value.trim().toLowerCase();
+            const pass = document.getElementById('login-pass').value;
+            if(!email || !pass) return showToast("Please enter email and password", "error");
+            
+            // Check Database
+            const user = usersDB.find(u => u.email === email && u.pass === pass);
+            
+            if(!user) {
+                return showToast("Invalid credentials. Please try again.", "error");
+            }
+
+            currentUser = user;
+            finishLoginSetup();
+        }
+
+        function handleRegister() {
+            const email = document.getElementById('reg-email').value.trim().toLowerCase();
+            const name = document.getElementById('reg-name').value.trim();
+            const pass = document.getElementById('reg-pass').value;
+            
+            if(!email || !name || !pass) return showToast("Please fill all fields", "error");
+
+            // ENFORCE ONE ACCOUNT PER EMAIL RULE
+            const existingUser = usersDB.find(u => u.email === email);
+            if(existingUser) {
+                return showToast("Error: Email is already registered. One account per email only.", "error");
+            }
+
+            const newUser = { email: email, pass: pass, name: name, role: 'user' };
+            usersDB.push(newUser); // Save to mock DB
+            
+            currentUser = newUser;
+            finishLoginSetup();
+            showToast("Account created successfully", "success");
+        }
+
+        function finishLoginSetup() {
+            document.getElementById('user-display-name').innerText = currentUser.name;
+            const avatarParams = new URLSearchParams({name: currentUser.name, background: 'd946ef', color: 'fff'});
+            document.getElementById('sidebar-avatar').src = `https://ui-avatars.com/api/?${avatarParams.toString()}`;
+            
+            document.getElementById('auth-view').classList.add('hidden');
+            document.getElementById('main-app').classList.remove('hidden');
+            
+            // Re-render sidebar based on user role (Admin vs Citizen)
+            renderSidebar();
+
+            if (currentUser.role === 'admin') {
+                showToast("Welcome to the Admin Portal", "success");
+                switchView('admin');
+                renderAdminDashboard();
+            } else {
+                showToast("Logged in successfully", "success");
+                switchView('assistant');
+                setTimeout(() => {
+                    speakText(`Welcome back to AI CORE, ${currentUser.name}. I am your intelligence assistant.`);
+                }, 1000);
+            }
+        }
+
+        function logout() {
+            currentUser = null;
+            document.getElementById('auth-view').classList.remove('hidden');
+            document.getElementById('main-app').classList.add('hidden');
+            // Reset forms
+            document.getElementById('login-pass').value = '';
+            document.getElementById('reg-pass').value = '';
+            stopTTS();
+        }
+
+        // --- 3.5 ADMIN PANEL LOGIC ---
+        function renderAdminDashboard() {
+            const table = document.getElementById('admin-applications-table');
+            const usersList = document.getElementById('admin-users-list');
+            
+            // Update stats
+            document.getElementById('admin-stat-users').innerText = usersDB.length;
+            document.getElementById('admin-stat-apps').innerText = adminApplicationsDB.length;
+            const pendingCount = adminApplicationsDB.filter(a => a.status === 'Pending').length;
+            document.getElementById('admin-stat-pending').innerText = pendingCount;
+
+            // Render Users List
+            usersList.innerHTML = usersDB.map(u => `
+                <div class="flex items-center gap-3 p-3 bg-panelBg rounded-xl border border-white/5 hover:border-primary/30 transition">
+                    <img src="https://ui-avatars.com/api/?name=${u.name}&background=random" class="w-10 h-10 rounded-full">
+                    <div class="overflow-hidden">
+                        <h4 class="font-bold text-sm truncate text-white">${u.name}</h4>
+                        <p class="text-xs text-gray-400 truncate">${u.email}</p>
+                        <span class="text-[10px] uppercase font-bold mt-1 inline-block ${u.role === 'admin' ? 'text-primary' : 'text-green-400'}">${u.role}</span>
+                    </div>
+                </div>
+            `).join('');
+
+            // Render Applications Table
+            table.innerHTML = adminApplicationsDB.map(app => {
+                let statusColor = "text-yellow-400 bg-yellow-500/10 border-yellow-500/20";
+                if(app.status === 'Approved') statusColor = "text-green-400 bg-green-500/10 border-green-500/20";
+                if(app.status === 'Rejected') statusColor = "text-red-400 bg-red-500/10 border-red-500/20";
+
+                let confColor = "text-green-400";
+                if(app.confidence < 70) confColor = "text-yellow-400";
+                if(app.confidence < 50) confColor = "text-red-400";
+
+                return `
+                <tr class="hover:bg-white/5 transition group">
+                    <td class="p-3 font-semibold text-gray-200">
+                        <div class="flex flex-col">
+                            <span>${app.user}</span>
+                            <span class="text-xs font-normal text-gray-500">${app.date}</span>
+                        </div>
+                    </td>
+                    <td class="p-3 text-gray-300 text-sm">
+                        <span class="block text-primary font-semibold">${app.title}</span>
+                        <span class="text-xs ${confColor}"><i class="fa-solid fa-robot"></i> ${app.confidence}% AI Match</span>
+                    </td>
+                    <td class="p-3">
+                        <span class="px-2 py-1 rounded text-xs font-bold border ${statusColor}">${app.status}</span>
+                    </td>
+                    <td class="p-3 text-right whitespace-nowrap">
+                        ${app.status === 'Pending' ? `
+                            <button onclick="adminAction(${app.id}, 'Approve')" class="text-xs bg-green-600 hover:bg-green-500 text-white px-2 py-1 rounded transition shadow-lg"><i class="fa-solid fa-check"></i></button>
+                            <button onclick="adminAction(${app.id}, 'Reject')" class="text-xs bg-red-600 hover:bg-red-500 text-white px-2 py-1 rounded transition shadow-lg"><i class="fa-solid fa-xmark"></i></button>
+                        ` : `<button class="text-xs text-gray-400 hover:text-white transition"><i class="fa-solid fa-eye"></i></button>`}
+                    </td>
+                </tr>
+            `}).join('');
+        }
+
+        function adminAction(id, action) {
+            const app = adminApplicationsDB.find(a => a.id === id);
+            if(app) {
+                app.status = action === 'Approve' ? 'Approved' : 'Rejected';
+                showToast(`Application for ${app.user} has been ${app.status}.`, action === 'Approve' ? 'success' : 'error');
+                renderAdminDashboard();
+            }
+        }
+
+        // --- 4. SPEECH RECOGNITION & SYNTHESIS ---
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition = null;
+        let ttsSynth = window.speechSynthesis;
+
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = currentLang;
+
+            recognition.onstart = function() {
+                isListening = true;
+                document.getElementById('main-mic-btn').classList.add('mic-active-ring');
+                document.getElementById('global-mic-indicator').classList.remove('hidden');
+                document.getElementById('listening-indicator').classList.remove('opacity-0');
+                stopTTS(); // Stop talking if user interrupts
+            };
+
+            recognition.onresult = function(event) {
+                const transcript = event.results[0][0].transcript;
+                document.getElementById('ai-text-input').value = transcript;
+                
+                if(transcript.toLowerCase().includes('mute') || transcript.toLowerCase().includes('stop')) {
+                    stopTTS();
+                    showToast("Audio muted.", "info");
+                    return;
+                }
+
+                // Auto submit to Gemini
+                handleAITextSubmit(transcript);
+            };
+
+            recognition.onerror = function(event) {
+                if (event.error !== 'no-speech') {
+                    console.error("Speech error:", event.error);
+                    showToast("Microphone error: " + event.error, "error");
+                }
+                stopListeningUI();
+            };
+
+            recognition.onend = function() {
+                stopListeningUI();
+            };
+        } else {
+            console.warn("Speech Recognition API not supported in this browser.");
+        }
+
+        function stopListeningUI() {
+            isListening = false;
+            document.getElementById('main-mic-btn').classList.remove('mic-active-ring');
+            document.getElementById('global-mic-indicator').classList.add('hidden');
+            document.getElementById('listening-indicator').classList.add('opacity-0');
+        }
+
+        function toggleVoiceAssistant() {
+            if(!recognition) return showToast("Voice input not supported on this browser.", "error");
+            
+            // Ensure we are on the assistant view
+            switchView('assistant');
+
+            if (isListening) {
+                recognition.stop();
+            } else {
+                recognition.lang = document.getElementById('lang-selector').value;
+                try {
+                    recognition.start();
+                } catch(e) { console.error(e); }
+            }
+        }
+
+        function updateVoiceLang() {
+            currentLang = document.getElementById('lang-selector').value;
+            if(recognition) recognition.lang = currentLang;
+            showToast(`Language set to ${currentLang}`, "info");
+        }
+
+        function speakText(text) {
+            if(!ttsSynth) return;
+            ttsSynth.cancel(); // stop current
+            
+            // Clean markdown asterisks for speech
+            const cleanText = text.replace(/\*/g, '').replace(/#/g, '');
+            
+            const utterance = new SpeechSynthesisUtterance(cleanText);
+            
+            // Map our dropdown values to basic synth langs
+            utterance.lang = currentLang; 
+            
+            // Try to find an appropriate voice
+            const voices = ttsSynth.getVoices();
+            const voice = voices.find(v => v.lang.startsWith(currentLang.split('-')[0]));
+            if(voice) utterance.voice = voice;
+
+            ttsSynth.speak(utterance);
+        }
+
+        function stopTTS() {
+            if(ttsSynth) ttsSynth.cancel();
+        }
+
+        // Initialize voices
+        if(ttsSynth.onvoiceschanged !== undefined) {
+            ttsSynth.onvoiceschanged = () => {};
+        }
+
+        // --- 5. GEMINI API INTEGRATION ---
+        
+        // Helper for API retries
+        async function fetchWithRetry(url, options, maxRetries = 5) {
+            let delay = 1000;
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (!response.ok) {
+                        const errorData = await response.json().catch(() => ({}));
+                        throw new Error(`HTTP ${response.status}: ${errorData.error?.message || 'Unknown error'}`);
+                    }
+                    return await response.json();
+                } catch (error) {
+                    if (i === maxRetries - 1) throw error;
+                    await new Promise(res => setTimeout(res, delay));
+                    delay *= 2; // Exponential backoff
+                }
+            }
+        }
+
+        async function handleAITextSubmit(textOverride = null) {
+            const inputEl = document.getElementById('ai-text-input');
+            const prompt = textOverride || inputEl.value;
+            if(!prompt.trim()) return;
+
+            // UI updates
+            const responseArea = document.getElementById('ai-response-area');
+            const responseText = document.getElementById('ai-response-text');
+            responseArea.classList.remove('hidden');
+            responseText.innerHTML = '<span class="animate-pulse">Analyzing request and profile...</span>';
+            if(!textOverride) inputEl.value = '';
+
+            // Build dynamic context for the AI
+            const userDocsList = documentsDB.map(d => d.name).join(', ');
+            const topSchemes = schemesDB.slice(0, 5).map(s => `ID:${s.id} ${s.title} (Requires: ${s.docs.join(', ')})`).join(' | ');
+            const topJobs = jobsDB.slice(0, 5).map(j => `ID:${j.id} ${j.title} (Requires: ${j.docs.join(', ')})`).join(' | ');
+
+            const systemContext = `You are AICORE, an advanced AI Voice Assistant for an Indian Government portal.
+            User State: ${currentState}. User Name: ${currentUser?.name || 'Citizen'}.
+            User's Saved Documents in Digital Locker: [${userDocsList}].
+            
+            Website Features you can explain or open:
+            - 'schemes': Explore/apply for govt schemes.
+            - 'jobs': Scholarships and government jobs.
+            - 'scam': Detect fake links, SMS, or QR codes.
+            - 'gps': Find nearby hospitals, police, etc.
+            - 'skills': Free certification courses.
+            - 'documents': Form Guidance / Documents Assistant (digital locker).
+            - 'emergency': Quick SOS dials.
+            
+            Sample Schemes: ${topSchemes}
+            Sample Jobs: ${topJobs}
+
+            YOUR CAPABILITIES & RULES:
+            1. READ & EXPLAIN SCHEMES: If the user asks about available schemes, verbally read out 2-3 relevant schemes based on their state/profile, and ask if they want to apply.
+            2. EXPLAIN & NAVIGATE: If the user asks what a feature does or how to access it, verbally explain the feature clearly and set action="NAVIGATE" with the target feature_id to open it for them.
+            3. CHECK ELIGIBILITY: If asked what they can apply for, compare their Saved Documents with the Requirements of Schemes/Jobs. Tell them exactly what they match based on their current locker.
+            4. FIX DOCUMENT ISSUES: If they ask to apply for a scheme/job but LACK a required document, explain exactly which document is missing and set action="NAVIGATE" with target="documents" to guide them to upload it in the Form Guidance section.
+            5. AUTO-APPLY (VOICE COMMAND): If they ask to apply for a specific scheme/job AND they have all required documents, set action="START_WIZARD", target=ID, targetType="scheme" or "job", and wizardStep=3 (to fast-track them directly to the final submit form). If they are missing docs, use wizardStep=2.
+            6. MUTE/UNMUTE: If asked to stop talking, shut up, or mute, set action="MUTE".
+
+            You MUST respond in strict JSON format matching this schema:
+            {
+                "message": "Your conversational response in the user's selected language (e.g. English, Hindi, Kannada, etc.).",
+                "action": "NAVIGATE" | "START_WIZARD" | "MUTE" | "NONE",
+                "target": "string (feature id) or number (item ID)",
+                "targetType": "scheme" | "job" | null,
+                "wizardStep": 1 | 2 | 3 | null
+            }`;
+
+            try {
+                // Hardcoded fast-paths for mute/unmute
+                const navCheck = prompt.toLowerCase();
+                if(navCheck === 'mute' || navCheck === 'stop talking' || navCheck === 'stop') {
+                    stopTTS();
+                    responseText.innerHTML = "Audio muted.";
+                    return;
+                }
+
+                // Call Gemini API with JSON output instruction
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${API_KEY}`;
+                
+                const payload = {
+                    contents: [{ role: "user", parts: [{ text: prompt }] }],
+                    systemInstruction: { parts: [{ text: systemContext }] },
+                    generationConfig: { responseMimeType: "application/json" }
+                };
+
+                const data = await fetchWithRetry(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const rawReply = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                if(!rawReply) throw new Error("Empty response from AI");
+
+                const responseObj = JSON.parse(rawReply);
+                
+                // Execute AI Commands
+                executeAICommand(responseObj, responseText);
+
+            } catch (error) {
+                // Suppress console error for 401/403 since we have a graceful fallback
+                if (!error.message.includes('401') && !error.message.includes('403')) {
+                    console.warn("Gemini API fallback triggered:", error.message);
+                }
+                const simulatedResponse = simulateAIResponse(prompt);
+                executeAICommand(simulatedResponse, responseText);
+            }
+        }
+
+        function executeAICommand(responseObj, responseTextEl) {
+            // 1. Update UI Text
+            responseTextEl.innerHTML = responseObj.message.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>').replace(/\n/g, '<br>');
+            
+            // 2. Speak Text
+            if(responseObj.action !== 'MUTE') {
+                speakText(responseObj.message);
+            }
+
+            // 3. Perform Actions
+            setTimeout(() => {
+                if(responseObj.action === 'NAVIGATE' && responseObj.target) {
+                    switchView(responseObj.target);
+                    showToast(`AI navigating to ${responseObj.target}...`, "info");
+                } 
+                else if (responseObj.action === 'START_WIZARD' && responseObj.target) {
+                    switchView(responseObj.targetType === 'job' ? 'jobs' : 'schemes');
+                    startWizard(parseInt(responseObj.target), responseObj.targetType, responseObj.wizardStep || 1);
+                }
+                else if (responseObj.action === 'MUTE') {
+                    stopTTS();
+                }
+            }, 1000); // Slight delay for better UX
+        }
+
+        function simulateAIResponse(prompt) {
+            const p = prompt.toLowerCase();
+            const docs = documentsDB.map(d=>d.name.toLowerCase());
+            const hasIncome = docs.some(d => d.includes('income'));
+
+            if(p.includes("mute") || p.includes("stop") || p.includes("shut up")) {
+                return { message: "Muting audio as requested.", action: "MUTE", target: null, targetType: null, wizardStep: null };
+            }
+            if(p.includes("close") || p.includes("back") || p.includes("dashboard")) {
+                return { message: "Closing the window and returning to the Voice Dashboard.", action: "NAVIGATE", target: "assistant", targetType: null, wizardStep: null };
+            }
+            if(p.includes("what schemes") || p.includes("read schemes") || p.includes("available schemes")) {
+                return {
+                    message: "Here are some schemes currently available: First, PM Kisan Samman Nidhi, offering 6000 rupees a year. Second, Ayushman Bharat for health insurance up to 5 lakh rupees. Third, Pradhan Mantri Awas Yojana for housing support. I am opening the window so you can see them all.",
+                    action: "NAVIGATE", target: "schemes", targetType: null, wizardStep: null
+                };
+            }
+            if(p.includes("kisan") || p.includes("apply") && p.includes("scheme")) {
+                // Simulating an auto-apply fast-track if they ask to apply
+                return { 
+                    message: "I am fast-tracking your application for PM Kisan Samman Nidhi. Because you have your Aadhaar and required documents in your locker, I have automatically filled the final form for you. Please review and click Final Submit to download or send it.", 
+                    action: "START_WIZARD", target: 1, targetType: "scheme", wizardStep: 3
+                };
+            }
+            if(p.includes("job") || p.includes("army")) {
+                return { 
+                    message: "Navigating to the jobs window. I have found the Indian Army Agniveer opening for you. I am opening the document verification step now.", 
+                    action: "START_WIZARD", target: 201, targetType: "job", wizardStep: 2
+                };
+            }
+            if(p.includes("learn") || p.includes("course") || p.includes("skill")) {
+                return { 
+                    message: "I am opening the Education and Skills window. Here, you can find over 50 free certified courses. You can choose Tech, Non-Tech, or Farming courses, and I can guide you through enrollment.", 
+                    action: "NAVIGATE", target: "skills", targetType: null, wizardStep: null 
+                };
+            }
+            if(p.includes("admin") || p.includes("command")) {
+                if(currentUser && currentUser.role === 'admin') {
+                    return { message: "Opening Admin Command Center window.", action: "NAVIGATE", target: "admin", targetType: null, wizardStep: null };
+                } else {
+                    return { message: "You do not have administrative privileges to access this window.", action: "NONE", target: null, targetType: null, wizardStep: null };
+                }
+            }
+            if(p.includes("eligible") || p.includes("can i apply") || p.includes("what can i")) {
+                if(!hasIncome) {
+                    return {
+                        message: "I analyzed your digital locker. You have your Aadhaar and 10th Marksheet, but you are missing an Income Certificate. You cannot apply for Ayushman Bharat or Scholarships without it. I am opening the Document Assistant window so you can upload it now.",
+                        action: "NAVIGATE", target: "documents", targetType: null, wizardStep: null
+                    };
+                }
+                return {
+                    message: "Since you have your Aadhaar and Income Certificate saved, you are highly eligible for Ayushman Bharat and the Post-Matric Scholarships. Would you like me to auto-apply for one of them?",
+                    action: "NONE", target: null, targetType: null, wizardStep: null
+                };
+            }
+            if(p.includes("scam") || p.includes("fake")) {
+                return { message: "I will open the Scam Detector window. This feature protects you from fraud. Please paste any suspicious SMS link or upload a screenshot of a QR code, and I will analyze it instantly.", action: "NAVIGATE", target: "scam", targetType: null, wizardStep: null };
+            }
+            if(p.includes("document") || p.includes("locker") || p.includes("form guidance")) {
+                return { message: "Opening your Form Guidance and Document Assistant window. Here you can upload missing IDs. I will use AI to read the text on them and store them securely so I can auto-fill your forms directly.", action: "NAVIGATE", target: "documents", targetType: null, wizardStep: null };
+            }
+            
+            return { 
+                message: `I am your AI assistant. I can open features in separate windows, check your eligibility against your uploaded documents, or read out available schemes directly using voice commands. For example, say: 'Read available schemes' or 'Apply for PM Kisan'.`, 
+                action: "NONE", target: null, targetType: null, wizardStep: null 
+            };
+        }
+
+        // --- 6. FEATURE LOGIC: SCHEMES & JOBS ---
+        function filterDataByState() {
+            currentState = document.getElementById('state-selector').value;
+            renderSchemes();
+            showToast(`Data filtered for ${currentState}`, "info");
+        }
+        
+        function refreshData() {
+            showToast("AI checking government portals for new schemes...", "info");
+            const syncIcon = document.querySelector('.fa-rotate');
+            if(syncIcon) syncIcon.classList.add('fa-spin');
+            
+            setTimeout(() => {
+                if(syncIcon) syncIcon.classList.remove('fa-spin');
+                
+                // Check if already added to avoid duplicates
+                if (!schemesDB.find(s => s.id === 999)) {
+                    schemesDB.unshift({ 
+                        id: 999, 
+                        title: "New AI-Discovered Scheme 2026", 
+                        desc: "Newly launched financial support scheme synced via AI web scraping.", 
+                        state: "All", 
+                        tags: ["New", "Finance"], 
+                        docs: ["Aadhaar Card", "Bank Passbook"] 
+                    });
+                    renderSchemes();
+                    showToast("Database updated with 1 new scheme using AI.", "success");
+                    speakText("I have synced the database and found one new scheme recently launched by the government.");
+                } else {
+                    showToast("Database is already up to date.", "success");
+                }
+            }, 2500);
+        }
+
+        function renderSchemes() {
+            const grid = document.getElementById('schemes-grid');
+            const filtered = schemesDB.filter(s => currentState === 'All' || s.state === 'All' || s.state === currentState);
+            
+            document.getElementById('scheme-count').innerText = filtered.length;
+
+            grid.innerHTML = filtered.map((s, index) => `
+                <div class="bg-cardBg border border-white/5 rounded-2xl p-6 flex flex-col hover:border-primary/50 transition duration-300 transform hover:-translate-y-1">
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="bg-primary/20 text-primary text-xs px-2 py-1 rounded font-semibold">${s.state === 'All' ? 'National' : s.state}</span>
+                        ${index < 3 ? '<span class="text-green-400 text-xs flex items-center gap-1"><i class="fa-solid fa-circle-check"></i> Eligible</span>' : ''}
+                    </div>
+                    <h3 class="font-bold text-lg mb-2 text-white">${s.title}</h3>
+                    <p class="text-gray-400 text-sm flex-1 mb-6 leading-relaxed">${s.desc}</p>
+                    <button onclick="startWizard(${s.id}, 'scheme')" class="w-full gradient-bg text-white font-bold py-3 rounded-xl shadow-lg hover:opacity-90 transition text-sm flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> APPLY WITH AI
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        let currentJobFilter = 'All';
+        
+        function setJobFilter(type) {
+            currentJobFilter = type;
+            
+            // Update button styles
+            ['All', 'Job', 'Scholarship'].forEach(f => {
+                const btn = document.getElementById(`job-btn-${f}`);
+                if (btn) {
+                    if (f === type) {
+                        btn.className = "bg-primary/20 text-primary border border-primary/50 px-4 py-1.5 rounded-full text-sm transition";
+                    } else {
+                        btn.className = "bg-cardBg border border-white/10 px-4 py-1.5 rounded-full text-sm text-gray-400 hover:text-white transition";
+                    }
+                }
+            });
+            
+            renderJobs();
+        }
+
+        function renderJobs() {
+            const grid = document.getElementById('jobs-grid');
+            const filtered = jobsDB.filter(j => currentJobFilter === 'All' || j.type === currentJobFilter);
+            
+            grid.innerHTML = filtered.map(j => `
+                <div class="bg-cardBg border border-white/5 rounded-2xl p-6 flex flex-col hover:border-secondary/50 transition duration-300 transform hover:-translate-y-1">
+                    <div class="mb-4 flex justify-between items-center">
+                        <span class="bg-secondary/20 text-secondary text-xs px-2 py-1 rounded font-semibold">${j.type}</span>
+                        <div class="flex gap-1">
+                            ${j.tags.slice(0, 2).map(t => `<span class="text-[10px] bg-white/5 text-gray-300 px-2 py-1 rounded">#${t}</span>`).join('')}
+                        </div>
+                    </div>
+                    <h3 class="font-bold text-lg mb-2 text-white">${j.title}</h3>
+                    <p class="text-gray-400 text-sm flex-1 mb-6 leading-relaxed">${j.desc}</p>
+                    <button onclick="startWizard(${j.id}, 'job')" class="w-full gradient-bg text-white font-bold py-3 rounded-xl shadow-lg hover:opacity-90 transition text-sm flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> APPLY WITH AI
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        // --- AI APPLICATION WIZARD LOGIC ---
+        let currentWizardItem = null;
+        let wizardStep = 1;
+        let wizardType = ''; // 'scheme' or 'job'
+        let pendingUploadDocName = "";
+
+        function startWizard(itemId, type, autoStep = 1) {
+            wizardType = type;
+            if(type === 'scheme') currentWizardItem = schemesDB.find(s => s.id === itemId);
+            if(type === 'job') currentWizardItem = jobsDB.find(j => j.id === itemId);
+            
+            if(!currentWizardItem) return;
+            
+            wizardStep = autoStep; // Support fast-tracking from voice command
+            document.getElementById('apply-modal').classList.remove('hidden');
+            document.getElementById('apply-modal').classList.add('flex');
+            renderWizardStep();
+        }
+
+        function closeModal() {
+            document.getElementById('apply-modal').classList.add('hidden');
+            document.getElementById('apply-modal').classList.remove('flex');
+            stopTTS();
+        }
+
+        function renderWizardStep() {
+            const body = document.getElementById('wizard-body');
+            const footer = document.getElementById('wizard-footer');
+            const indicator = document.getElementById('modal-step-indicator');
+            const title = document.getElementById('modal-title');
+
+            title.innerText = currentWizardItem.title;
+            indicator.innerText = `Step ${wizardStep} of 3: ${wizardStep === 1 ? 'Details' : wizardStep === 2 ? 'Document Verification' : 'Final Submit'}`;
+
+            if(wizardStep === 1) {
+                // Step 1: Explanation
+                body.innerHTML = `
+                    <div class="flex items-start gap-4 bg-primary/10 border border-primary/20 p-4 rounded-xl mb-6">
+                        <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary shrink-0 animate-pulse">
+                            <i class="fa-solid fa-volume-high"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-300 leading-relaxed font-medium">
+                                "I am your AI assistant. Here are the details for the <strong>${currentWizardItem.title}</strong> ${wizardType}. 
+                                ${currentWizardItem.desc} let's proceed to check your eligibility and documents."
+                            </p>
+                        </div>
+                    </div>
+                    <div class="space-y-4">
+                        <div class="bg-cardBg p-4 rounded-xl border border-white/5">
+                            <h4 class="text-xs text-gray-400 uppercase tracking-wider mb-2">Required Documents</h4>
+                            <div class="flex flex-wrap gap-2">
+                                ${currentWizardItem.docs.map(d => `<span class="bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg text-sm text-gray-300 flex items-center gap-2"><i class="fa-regular fa-file-lines"></i> ${d}</span>`).join('')}
+                            </div>
+                        </div>
+                        <div class="bg-cardBg p-4 rounded-xl border border-white/5">
+                            <h4 class="text-xs text-gray-400 uppercase tracking-wider mb-2">Category / Tags</h4>
+                            <div class="flex gap-2">
+                                ${currentWizardItem.tags.map(t => `<span class="text-primary text-sm font-semibold">#${t}</span>`).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                footer.innerHTML = `
+                    <button onclick="closeModal()" class="px-5 py-2.5 rounded-xl text-sm text-gray-400 hover:text-white hover:bg-white/5 transition font-semibold">Cancel</button>
+                    <button onclick="nextWizardStep()" class="gradient-bg px-6 py-2.5 rounded-xl text-sm font-bold text-white shadow-[0_0_20px_rgba(236,72,153,0.3)] hover:opacity-90 transition flex items-center gap-2">
+                        Verify Documents <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                `;
+                
+                // Speak explanation
+                speakText(`I am your AI assistant. You selected ${currentWizardItem.title}. ${currentWizardItem.desc}. Click Verify Documents to continue.`);
+            } 
+            else if (wizardStep === 2) {
+                // Step 2: Document Check
+                const userDocs = documentsDB.map(d => d.name.toLowerCase());
+                let missingDocs = [];
+                let verifiedDocsHTML = "";
+
+                currentWizardItem.docs.forEach(doc => {
+                    const isPresent = userDocs.some(ud => ud.includes(doc.toLowerCase()) || doc.toLowerCase().includes(ud));
+                    if(isPresent) {
+                        verifiedDocsHTML += `
+                            <div class="flex items-center justify-between bg-green-500/10 border border-green-500/20 p-3 rounded-xl">
+                                <div class="flex items-center gap-3">
+                                    <i class="fa-solid fa-circle-check text-green-500 text-lg"></i>
+                                    <span class="text-sm font-medium text-gray-200">${doc}</span>
+                                </div>
+                                <span class="text-xs text-green-400 bg-green-500/20 px-2 py-1 rounded">Found in Locker</span>
+                            </div>`;
+                    } else {
+                        missingDocs.push(doc);
+                        verifiedDocsHTML += `
+                            <div class="flex items-center justify-between bg-red-500/10 border border-red-500/20 p-3 rounded-xl">
+                                <div class="flex items-center gap-3">
+                                    <i class="fa-solid fa-circle-xmark text-red-500 text-lg"></i>
+                                    <span class="text-sm font-medium text-gray-200">${doc}</span>
+                                </div>
+                                <button onclick="triggerWizardDocUpload('${doc}')" class="text-xs bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded transition shadow-lg">Upload Now</button>
+                            </div>`;
+                    }
+                });
+
+                body.innerHTML = `
+                    <div class="flex items-start gap-4 bg-primary/10 border border-primary/20 p-4 rounded-xl mb-6">
+                        <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary shrink-0">
+                            <i class="fa-solid fa-folder-open"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-300 leading-relaxed font-medium" id="wizard-doc-speech">
+                                "I am checking your Form Guidance and Documents Assistant... ${missingDocs.length === 0 ? 'Excellent! I have taken all required documents directly from your locker. We can proceed to apply.' : 'Some required documents are missing from your locker. You only need to upload the missing ones below.'}"
+                            </p>
+                        </div>
+                    </div>
+                    <div class="space-y-3">
+                        ${verifiedDocsHTML}
+                    </div>
+                    <!-- Hidden input for wizard uploads -->
+                    <input type="file" id="wizard-upload-input" class="hidden" accept="image/*,.pdf" onchange="handleWizardUpload(event)">
+                `;
+
+                const canProceed = missingDocs.length === 0;
+                footer.innerHTML = `
+                    <button onclick="prevWizardStep()" class="px-5 py-2.5 rounded-xl text-sm text-gray-400 hover:text-white hover:bg-white/5 transition font-semibold">Back</button>
+                    <button onclick="nextWizardStep()" class="px-6 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition flex items-center gap-2 ${canProceed ? 'gradient-bg hover:opacity-90' : 'bg-gray-700 opacity-50 cursor-not-allowed'}" ${!canProceed ? 'disabled' : ''}>
+                        Generate Form <i class="fa-solid fa-file-contract"></i>
+                    </button>
+                `;
+
+                speakText(missingDocs.length === 0 ? "Excellent. All documents verified from your Form Guidance assistant. Click Generate form to proceed." : `You are missing ${missingDocs.length} documents. Please click upload now to add them.`);
+            }
+            else if (wizardStep === 3) {
+                // Step 3: Auto Fill & Submit
+                body.innerHTML = `
+                    <div class="flex items-start gap-4 bg-green-500/10 border border-green-500/20 p-4 rounded-xl mb-6">
+                        <div class="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 shrink-0">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-300 leading-relaxed font-medium">
+                                "I have successfully auto-filled your application using details extracted from your documents. You can download the physical form for offline use or submit it digitally right now."
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <form class="space-y-4 bg-cardBg border border-white/5 p-5 rounded-xl">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs text-gray-400 mb-1">Applicant Name</label>
+                                <input type="text" class="w-full bg-panelBg border border-white/5 rounded-lg p-2.5 text-sm text-gray-200 cursor-not-allowed" value="${currentUser?.name || 'Citizen'}" readonly>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-400 mb-1">Aadhaar Last 4</label>
+                                <input type="text" class="w-full bg-panelBg border border-white/5 rounded-lg p-2.5 text-sm text-gray-200 cursor-not-allowed" value="XXXX-8912" readonly>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Application For</label>
+                            <input type="text" class="w-full bg-panelBg border border-white/5 rounded-lg p-2.5 text-sm text-gray-200 cursor-not-allowed" value="${currentWizardItem.title}" readonly>
+                        </div>
+                        <div class="pt-2">
+                            <div class="flex items-center gap-2 text-xs text-green-400 bg-green-500/10 px-3 py-2 rounded border border-green-500/20">
+                                <i class="fa-solid fa-shield-check"></i> E-Signature & All Documents Attached Automatically
+                            </div>
+                        </div>
+                    </form>
+                `;
+
+                footer.innerHTML = `
+                    <button onclick="prevWizardStep()" class="px-5 py-2.5 rounded-xl text-sm text-gray-400 hover:text-white hover:bg-white/5 transition font-semibold">Back</button>
+                    <div class="flex gap-3">
+                        <button onclick="downloadSimulatedForm()" class="bg-cardBg border border-white/10 hover:bg-white/5 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition flex items-center gap-2">
+                            <i class="fa-solid fa-download"></i> Download PDF
+                        </button>
+                        <button onclick="submitFinalApplication()" class="gradient-bg px-6 py-2.5 rounded-xl text-sm font-bold text-white shadow-[0_0_20px_rgba(236,72,153,0.3)] hover:opacity-90 transition flex items-center gap-2">
+                            Final Submit <i class="fa-solid fa-paper-plane"></i>
+                        </button>
+                    </div>
+                `;
+
+                speakText("Application form auto-filled successfully. You can download the PDF to your local storage or click Final Submit to send it directly to the government portal.");
+            }
+        }
+
+        function nextWizardStep() {
+            if(wizardStep < 3) {
+                wizardStep++;
+                renderWizardStep();
+            }
+        }
+
+        function prevWizardStep() {
+            if(wizardStep > 1) {
+                wizardStep--;
+                renderWizardStep();
+            }
+        }
+
+        function triggerWizardDocUpload(docName) {
+            pendingUploadDocName = docName;
+            document.getElementById('wizard-upload-input').click();
+        }
+
+        function handleWizardUpload(event) {
+            const file = event.target.files[0];
+            if(!file) return;
+            
+            showToast(`Uploading and extracting ${pendingUploadDocName}...`, "info");
+            speakText(`Uploading ${pendingUploadDocName}. Please wait while I extract the details.`);
+            
+            // Simulate processing delay
+            setTimeout(() => {
+                // Add to locker
+                documentsDB.push({ 
+                    name: pendingUploadDocName, 
+                    verified: true, 
+                    date: new Date().toISOString().split('T')[0], 
+                    icon: pendingUploadDocName.includes("Bank") ? "fa-money-check" : "fa-file-contract"
+                });
+                
+                showToast(`${pendingUploadDocName} uploaded successfully!`, "success");
+                renderDocuments(); // Update locker view in background
+                renderWizardStep(); // Re-render step 2 to show green check
+            }, 2000);
+        }
+
+        function downloadSimulatedForm() {
+            showToast("Generating and downloading form...", "info");
+            
+            setTimeout(() => {
+                // Create a real downloadable text file simulating the filled form
+                const formData = `
+=========================================
+GOVERNMENT APPLICATION FORM (AUTO-FILLED)
+=========================================
+Application For: ${currentWizardItem.title}
+Applicant Name : ${currentUser?.name || 'Citizen'}
+State/Region   : ${currentState === 'All' ? currentWizardItem.state || 'National' : currentState}
+Date Generated : ${new Date().toLocaleDateString()}
+
+Status: Auto-filled by AICORE Assistant
+Documents Automatically Attached from Locker: 
+${currentWizardItem.docs.map(d => "- " + d).join('\n')}
+
+(This is a simulated downloaded form for offline reference to fill in the real applying website)
+=========================================
+                `;
+                
+                const blob = new Blob([formData], { type: "text/plain" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `Application_${currentWizardItem.title.replace(/\s+/g, '_')}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                showToast("Form downloaded to local storage successfully.", "success");
+                speakText("Your form has been generated and downloaded to your local storage successfully. You can review it or use it to apply.");
+            }, 1500);
+        }
+
+        function submitFinalApplication() {
+            closeModal();
+            showToast("Application submitted successfully to Govt servers via AI routing.", "success");
+            speakText("Congratulations! Your application for " + currentWizardItem.title + " has been submitted successfully. You will receive an SMS with your tracking ID shortly.");
+            
+            // Add an alert for tracking in User Dashboard
+            documentsDB.push({ name: "Tracking: " + currentWizardItem.title, verified: false, date: new Date().toISOString().split('T')[0], icon: "fa-satellite-dish", alert: true });
+            renderAlerts();
+
+            // PUSH TO ADMIN DASHBOARD DATBASE LIVE
+            adminApplicationsDB.unshift({
+                id: Math.floor(Math.random() * 9000) + 1000,
+                user: currentUser?.name || 'Citizen',
+                title: currentWizardItem.title,
+                date: new Date().toISOString().split('T')[0],
+                confidence: Math.floor(Math.random() * 20) + 80, // Random 80-99% AI match confidence
+                status: 'Pending'
+            });
+        }
+
+        // --- 7. FEATURE LOGIC: SCAM DETECTOR ---
+        async function analyzeScamText() {
+            const text = document.getElementById('scam-input-text').value;
+            if(!text) return showToast("Please enter text or link to analyze", "error");
+
+            const resArea = document.getElementById('scam-result-area');
+            const title = document.getElementById('scam-title');
+            const conf = document.getElementById('scam-confidence');
+            const expl = document.getElementById('scam-explanation');
+            const icon = document.getElementById('scam-icon');
+
+            resArea.classList.remove('hidden');
+            title.innerText = "Analyzing...";
+            conf.innerText = "";
+            expl.innerText = "AI is evaluating the patterns...";
+            icon.className = "w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold bg-gray-500/20 text-gray-500 animate-pulse";
+            icon.innerHTML = "<i class='fa-solid fa-spinner fa-spin'></i>";
+
+            // Simulate API call for scam detection logic
+            const prompt = `Analyze this text/link for scam probability: "${text}". Is it likely a scam? Give a short reason.`;
+            
+            try {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${API_KEY}`;
+                const payload = { contents: [{ parts: [{ text: prompt }] }] };
+                const data = await fetchWithRetry(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                
+                // Basic heuristic based on output
+                const isScam = reply.toLowerCase().includes('scam') || reply.toLowerCase().includes('suspicious') || reply.toLowerCase().includes('phishing');
+                displayScamResult(isScam, "AI Analysis Complete", reply);
+            } catch (e) {
+                // Fallback Simulation
+                setTimeout(() => {
+                    const isScam = text.toLowerCase().includes("free") || text.toLowerCase().includes("http");
+                    const reason = isScam ? "This contains classic phishing patterns or promises of unverified free items. Do not click links or share OTPs." 
+                                        : "This text does not exhibit strong signs of a common scam, but always remain vigilant.";
+                    displayScamResult(isScam, isScam ? "High Risk Detected" : "Low Risk", reason);
+                }, 1500);
+            }
+        }
+
+        function displayScamResult(isScam, headerText, explanation) {
+            const title = document.getElementById('scam-title');
+            const conf = document.getElementById('scam-confidence');
+            const expl = document.getElementById('scam-explanation');
+            const icon = document.getElementById('scam-icon');
+
+            title.innerText = headerText;
+            expl.innerText = explanation;
+
+            if(isScam) {
+                icon.className = "w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold bg-red-500/20 text-red-500";
+                icon.innerHTML = "<i class='fa-solid fa-triangle-exclamation'></i>";
+                conf.innerHTML = '<span class="text-red-400">98% Scam Probability</span>';
+            } else {
+                icon.className = "w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold bg-green-500/20 text-green-500";
+                icon.innerHTML = "<i class='fa-solid fa-shield-check'></i>";
+                conf.innerHTML = '<span class="text-green-400">Looks Safe</span>';
+            }
+        }
+
+        function handleScamImageUpload(event) {
+            const file = event.target.files[0];
+            if(!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = document.getElementById('scam-image-preview');
+                img.src = e.target.result;
+                img.classList.remove('hidden');
+                
+                // Simulate Vision API
+                setTimeout(() => {
+                    document.getElementById('scam-result-area').classList.remove('hidden');
+                    displayScamResult(true, "Suspicious QR/Image", "The image contains an untrusted payment QR code pattern commonly used in UPI frauds. Do not scan.");
+                }, 2000);
+            }
+            reader.readAsDataURL(file);
+        }
+
+        // --- 8. FEATURE LOGIC: ALERTS & DOCUMENTS ---
+        function renderAlerts() {
+            const list = document.getElementById('alerts-list');
+            list.innerHTML = documentsDB.filter(d => d.alert).map(d => `
+                <div class="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-start gap-4">
+                    <div class="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center text-red-400 shrink-0 mt-1">
+                        <i class="fa-solid fa-bell-on animate-pulse"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-red-400">Document Expiry Alert</h3>
+                        <p class="text-sm text-gray-300 mt-1">Your <strong>${d.name}</strong> needs to be updated. It is close to validation expiration.</p>
+                        <button onclick="switchView('documents')" class="mt-2 text-xs bg-red-500/20 text-red-400 px-3 py-1 rounded hover:bg-red-500/40 transition">Update Now</button>
+                    </div>
+                </div>
+            `).join('');
+            
+            // Add a default generic alert
+            list.innerHTML += `
+                <div class="bg-cardBg border border-white/5 rounded-xl p-4 flex items-start gap-4">
+                    <div class="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 shrink-0 mt-1">
+                        <i class="fa-solid fa-info"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-blue-400">New Scheme Match</h3>
+                        <p class="text-sm text-gray-300 mt-1">Based on your profile, you are eligible for the PM Kisan scheme.</p>
+                        <button onclick="switchView('schemes')" class="mt-2 text-xs bg-blue-500/20 text-blue-400 px-3 py-1 rounded hover:bg-blue-500/40 transition">View Scheme</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderDocuments() {
+            const grid = document.getElementById('documents-grid');
+            grid.innerHTML = documentsDB.map(d => `
+                <div class="bg-cardBg border ${d.alert ? 'border-red-500/50' : 'border-white/5'} rounded-xl p-4 flex items-center gap-4 relative">
+                    <div class="w-12 h-12 rounded-lg bg-panelBg flex items-center justify-center text-xl text-gray-400">
+                        <i class="fa-solid ${d.icon}"></i>
+                    </div>
+                    <div class="flex-1">
+                        <h4 class="font-semibold text-sm">${d.name}</h4>
+                        <p class="text-xs text-gray-500">Added: ${d.date}</p>
+                    </div>
+                    ${d.verified ? '<i class="fa-solid fa-circle-check text-green-500 absolute top-2 right-2 text-xs"></i>' : ''}
+                </div>
+            `).join('');
+        }
+
+        function handleDocumentUpload(event) {
+            const file = event.target.files[0];
+            if(!file) return;
+            
+            showToast("Processing document with AI...", "info");
+            
+            // Simulate Gemini Vision processing the ID card
+            setTimeout(() => {
+                const res = document.getElementById('doc-scan-result');
+                const dataGrid = document.getElementById('doc-extracted-data');
+                
+                dataGrid.innerHTML = `
+                    <div class="bg-black/30 p-2 rounded"><span class="text-gray-500 text-xs block">Document Type</span><strong>Aadhaar Card</strong></div>
+                    <div class="bg-black/30 p-2 rounded"><span class="text-gray-500 text-xs block">Name</span><strong>Citizen India</strong></div>
+                    <div class="bg-black/30 p-2 rounded"><span class="text-gray-500 text-xs block">ID Number</span><strong>XXXX-XXXX-1234</strong></div>
+                    <div class="bg-black/30 p-2 rounded"><span class="text-gray-500 text-xs block">DOB</span><strong>01/01/1990</strong></div>
+                `;
+                res.classList.remove('hidden');
+                showToast("Extraction complete", "success");
+            }, 2000);
+        }
+
+        function saveExtractedDoc() {
+            document.getElementById('doc-scan-result').classList.add('hidden');
+            documentsDB.push({ name: "New Uploaded Doc", verified: true, date: new Date().toISOString().split('T')[0], icon: "fa-file" });
+            renderDocuments();
+            showToast("Saved to locker. AI will now use this for auto-fill.", "success");
+        }
+
+        // --- 9. FEATURE LOGIC: GPS ---
+        function initGPS() {
+            const status = document.getElementById('gps-status');
+            const coords = document.getElementById('gps-coords');
+            
+            if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        status.classList.add('hidden');
+                        document.getElementById('gps-results').classList.remove('hidden');
+                        document.getElementById('gps-results').classList.add('flex');
+                        coords.innerText = `Lat: ${position.coords.latitude.toFixed(4)}, Lng: ${position.coords.longitude.toFixed(4)}`;
+                        findNearby('Hospitals'); // default
+                    },
+                    (error) => {
+                        showToast("Location access denied or unavailable.", "error");
+                        // Mock it anyway for demo
+                        status.classList.add('hidden');
+                        document.getElementById('gps-results').classList.remove('hidden');
+                        document.getElementById('gps-results').classList.add('flex');
+                        coords.innerText = "Lat: 12.9716, Lng: 77.5946 (Mocked)";
+                        findNearby('Hospitals');
+                    }
+                );
+            } else {
+                showToast("Geolocation is not supported by this browser.", "error");
+            }
+        }
+
+        function findNearby(type) {
+            document.getElementById('gps-search-title').innerText = `Nearby ${type}`;
+            const list = document.getElementById('gps-list');
+            
+            // Mock data generation
+            const mockData = [
+                { name: `Govt ${type} Center 1`, dist: "1.2 km", status: "Open" },
+                { name: `District ${type} Hub`, dist: "3.5 km", status: "Open" },
+                { name: `Local ${type} Branch`, dist: "5.0 km", status: "Closed" },
+            ];
+
+            list.innerHTML = mockData.map(item => `
+                <div class="bg-panelBg border border-white/5 rounded-lg p-3 flex justify-between items-center hover:bg-white/5 transition cursor-pointer">
+                    <div>
+                        <h4 class="font-semibold text-sm">${item.name}</h4>
+                        <p class="text-xs text-gray-400 mt-1"><i class="fa-solid fa-route"></i> ${item.dist}</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xs ${item.status==='Open'?'text-green-400':'text-red-400'}">${item.status}</span>
+                        <button class="block mt-1 text-xs text-primary hover:underline">Get Directions</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // --- 10. FEATURE LOGIC: SKILLS & EDUCATION ---
+        let currentSkillCategory = 'All';
+
+        function filterCoursesByCategory(category) {
+            currentSkillCategory = category;
+            
+            // Reset borders
+            ['Tech', 'Non-Tech', 'Farming'].forEach(cat => {
+                const el = document.getElementById(`skill-cat-${cat}`);
+                if(el) {
+                    if(cat === category) el.classList.add('ring-2', 'ring-primary');
+                    else el.classList.remove('ring-2', 'ring-primary');
+                }
+            });
+
+            document.getElementById('skill-search-input').value = ''; // clear search
+            renderCourses();
+        }
+
+        function filterCoursesBySearch() {
+            const query = document.getElementById('skill-search-input').value.toLowerCase();
+            renderCourses(query);
+        }
+
+        function renderCourses(searchQuery = '') {
+            const grid = document.getElementById('skills-grid');
+            
+            const filtered = coursesDB.filter(c => {
+                const matchesCat = currentSkillCategory === 'All' || c.type === currentSkillCategory;
+                const matchesSearch = c.title.toLowerCase().includes(searchQuery) || c.provider.toLowerCase().includes(searchQuery);
+                return matchesCat && matchesSearch;
+            });
+
+            document.getElementById('course-list-title').innerText = currentSkillCategory === 'All' ? 'All Certified Courses' : `${currentSkillCategory} Courses`;
+            document.getElementById('course-count').innerText = `${filtered.length} Courses`;
+
+            grid.innerHTML = filtered.map(c => `
+                <div class="bg-cardBg border border-white/5 rounded-2xl overflow-hidden flex flex-col hover:border-primary/50 hover:-translate-y-1 transition duration-300 group">
+                    <!-- Image / Icon Header area -->
+                    <div class="h-32 bg-gradient-to-br ${c.color} flex items-center justify-center relative overflow-hidden">
+                        <div class="absolute inset-0 bg-black/20 group-hover:bg-transparent transition"></div>
+                        <i class="fa-solid ${c.icon} text-5xl text-white/80 group-hover:scale-110 transition-transform duration-500 z-10"></i>
+                        <span class="absolute top-2 right-2 bg-black/50 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-1 rounded">100% FREE</span>
+                    </div>
+                    
+                    <div class="p-5 flex-1 flex flex-col">
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">${c.provider}</span>
+                            <span class="bg-green-500/10 text-green-400 border border-green-500/20 text-[10px] px-2 py-0.5 rounded flex items-center gap-1"><i class="fa-solid fa-certificate"></i> Certified</span>
+                        </div>
+                        <h4 class="font-bold mb-1 text-white leading-tight text-sm">${c.title}</h4>
+                        <p class="text-xs text-gray-500 mb-4 flex items-center gap-1"><i class="fa-regular fa-clock"></i> Duration: ${c.duration}</p>
+                        
+                        <div class="mt-auto flex flex-col gap-2">
+                            <button onclick="explainEnrollment(${c.id})" class="text-xs text-primary hover:text-white flex items-center justify-center gap-2 border border-primary/20 hover:bg-primary/20 py-2 rounded transition">
+                                <i class="fa-solid fa-volume-high"></i> Listen How to Enroll
+                            </button>
+                            <button onclick="enrollInCourse(${c.id})" class="w-full bg-white/10 hover:bg-white/20 text-white text-sm font-semibold py-2.5 rounded transition shadow-lg">
+                                Enroll Now
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function explainEnrollment(courseId) {
+            const course = coursesDB.find(c => c.id === courseId);
+            if(!course) return;
+            
+            showToast(`Voice Assistant explaining enrollment for ${course.title}...`, "info");
+            
+            const explanation = `I am your AI assistant. To enroll in the free ${course.title} course provided by ${course.provider}, 
+            simply click the 'Enroll Now' button. Because you already have your Aadhaar Card saved in your Document Locker, 
+            I will automatically fill out the registration form for you. After you enroll, you will have ${course.duration} of training, 
+            followed by a government certification.`;
+
+            // Display in the AI text area briefly for accessibility
+            switchView('assistant');
+            const responseArea = document.getElementById('ai-response-area');
+            const responseText = document.getElementById('ai-response-text');
+            responseArea.classList.remove('hidden');
+            responseText.innerHTML = `<strong>Explaining ${course.title} Enrollment:</strong><br>` + explanation;
+            
+            speakText(explanation);
+            
+            // Switch back to skills view automatically after a delay so they can click the button
+            setTimeout(() => {
+                switchView('skills');
+            }, 5000);
+        }
+
+        function enrollInCourse(courseId) {
+            const course = coursesDB.find(c => c.id === courseId);
+            if(!course) return;
+
+            showToast(`Checking Digital Locker to auto-fill ${course.title} registration...`, "info");
+            speakText(`Processing enrollment for ${course.title}. Applying your digital locker details.`);
+            
+            setTimeout(() => {
+                showToast(`Successfully enrolled in ${course.title}!`, "success");
+                speakText("Success. You are now enrolled. Your learning dashboard will update shortly.");
+            }, 2000);
+        }
+
+        function renderEmergency() {
+            const grid = document.getElementById('emergency-grid');
+            grid.innerHTML = emergencyDB.map(e => `
+                <a href="tel:${e.number}" class="bg-cardBg border border-white/5 rounded-xl p-6 flex items-center justify-between hover:bg-white/5 transition group">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-full ${e.color} flex items-center justify-center text-xl shadow-lg group-hover:scale-110 transition-transform">
+                            <i class="fa-solid ${e.icon} text-white"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-lg">${e.name}</h3>
+                            <p class="text-gray-400 text-sm">Tap to dial</p>
+                        </div>
+                    </div>
+                    <div class="text-2xl font-black tracking-widest text-white/50 group-hover:text-white transition">
+                        ${e.number}
+                    </div>
+                </a>
+            `).join('');
+        }
+
+    </script>
+</body>
+</html>
